@@ -33,8 +33,8 @@ default: ${LIBNAME}.so
 vi:
 	vim cuda-plugin.c
 
-proxy: cudaproxy.cu
-	nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $<
+cudaproxy: cudaproxy.cu
+	nvcc -cudart shared -DSTANDALONE -I. -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $<
 
 test1: test/test1.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o test1 test1.cu

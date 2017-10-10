@@ -13,7 +13,8 @@
 # include <sys/shm.h>
 #endif
 
-#include "cudaproxy.h"
+// Definitions of common structs shared with the main process
+#include "cuda_plugin.h"
 
 #ifdef USE_SHM
 int shmID;
