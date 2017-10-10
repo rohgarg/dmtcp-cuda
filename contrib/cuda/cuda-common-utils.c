@@ -16,6 +16,9 @@
 # include <sys/shm.h>
 #endif
 
+#define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
+                        } while (0)
+
 #include "cuda_plugin.h"
 
 int initialized = False;
@@ -35,77 +38,58 @@ void proxy_initialize(void)
   memset(&sa_proxy, 0, sizeof(sa_proxy));
   strcpy(sa_proxy.sun_path, SKTNAME);
   sa_proxy.sun_family = AF_UNIX;
-#if 0 // Disable this for now. Manually launch the proxy from another terminal
-  char *const args[] = {"../..//dmtcp_nocheckpoint",
+  char *const args[] = {"../../bin/dmtcp_nocheckpoint",
                         "./cudaproxy",
                         SKTNAME,
                         NULL};
 
-  switch (_real_fork())
-  {
+  switch (_real_fork()) {
     case -1:
-      perror("fork()");
-      exit(EXIT_FAILURE);
+      errExit("fork()");
 
     case 0:
-      if (execvp((const char*)args[0], args) == -1)
-      {
-        perror("execvp");
-        exit(EXIT_FAILURE);
+      if (execvp((const char*)args[0], args) == -1) {
+        errExit("execvp");
       }
   }
-#endif
   
 #if USE_SHM
   // create shared memory
   key_t shmKey;
-  if ((shmKey = ftok(".", 1) == -1))
-  {
-    perror("ftok()");
-    exit(EXIT_FAILURE);
+  if ((shmKey = ftok(".", 1) == -1)) {
+    errExit("ftok()");
   }
 
   int shm_flags = IPC_CREAT | 0666;
   int shmID;
-  if ((shmID = shmget(shmKey, SHMSIZE, shm_flags)) == -1)
-  {
-    perror("shmget()");
-    exit(EXIT_FAILURE);
+  if ((shmID = shmget(shmKey, SHMSIZE, shm_flags)) == -1) {
+    errExit("shmget()");
   }
   
-  if ((shmaddr = shmat(shmID, NULL, 0)) == (void *)-1)
-  {
-    perror("shmat()");
-    exit(EXIT_FAILURE);
+  if ((shmaddr = shmat(shmID, NULL, 0)) == (void *)-1) {
+    errExit("shmat()");
   }
 #endif
 
   // connect to the proxy:server
-   if ((skt_master = socket(AF_UNIX, SOCK_STREAM, 0)) == 1)
-  {
-    perror("socket()");
-    exit(EXIT_FAILURE);
+  if ((skt_master = socket(AF_UNIX, SOCK_STREAM, 0)) == 1) {
+    errExit("socket()");
   }
 
-  while (connect(skt_master, (struct sockaddr *)&sa_proxy, sizeof(sa_proxy)) == -1)
-  {
-    if (errno = ENOENT)
-    {
+  while (connect(skt_master, (struct sockaddr *)&sa_proxy, sizeof(sa_proxy)) == -1) {
+    if (errno = ENOENT) {
       sleep(1);
       continue;
+    } else {
+      errExit("connect");
     }
-
-    else
-      exit(EXIT_FAILURE);
   }
   
 #if USE_SHM
   // Send the shmID to the proxy
   int realId = dmtcp_virtual_to_real_shmid(shmID);
-  if (write(skt_master, &realId, sizeof(shmID)) == -1)
-  {
-    perror("write()");
-    exit(EXIT_FAILURE);
+  if (write(skt_master, &realId, sizeof(shmID)) == -1) {
+    errExit("write()");
   }
 #endif
 
@@ -116,20 +100,16 @@ void proxy_initialize(void)
 // append a cuda system call structure to it
 void log_append(cudaSyscallStructure record)
 {
-  if (write(logFd, &record, sizeof(record)) == -1)
-  {
-    perror("write()");
-    exit(EXIT_FAILURE);
+  if (write(logFd, &record, sizeof(record)) == -1) {
+    errExit("write()");
   }
 }
 
 int log_read(cudaSyscallStructure *record)
 {
   int ret = read(logFd, record, sizeof(*record));
-  if (ret == -1)
-  {
-    perror("write()");
-    exit(EXIT_FAILURE);
+  if (ret == -1) {
+    errExit("write()");
   }
   if (ret == 0 || ret < sizeof(*record)) {
     return False;
@@ -145,37 +125,30 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val)
 {
    // send the structure
-  if (write(fd, strce_to_send, sizeof(cudaSyscallStructure)) == -1)
-  {
-    perror("write()");
-    exit(EXIT_FAILURE);
+  if (write(fd, strce_to_send, sizeof(cudaSyscallStructure)) == -1) {
+    errExit("write()");
   }
 
   if (strce_to_send->payload) {
     if (write(fd, strce_to_send->payload, strce_to_send->payload_size) == -1) {
-      perror("write()");
-      exit(EXIT_FAILURE);
+      errExit("write()");
     }
   }
 
    // receive the result
-  if (read(fd, ret_val, sizeof(int)) == -1)
-  {
-    perror("read()");
-    exit(EXIT_FAILURE);
+  if (read(fd, ret_val, sizeof(int)) == -1) {
+    errExit("read()");
   }
 
   if ((*ret_val) != cudaSuccess)
   {
-    printf("cuda syscall failed\n");
+    DPRINTF("cuda syscall failed\n");
     exit(EXIT_FAILURE);
   }
 
   // get the structure back
   memset(rcvd_strce, 0, sizeof(cudaSyscallStructure));
-  if (read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) == -1)
-  {
-    perror("read()");
-    exit(EXIT_FAILURE);
+  if (read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) == -1) {
+    errExit("read()");
   }
 }

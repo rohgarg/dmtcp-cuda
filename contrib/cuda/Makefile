@@ -42,7 +42,7 @@ test1: test/test1.cu
 test2: test/test2.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o test2 test2.cu
 
-check: ${LIBNAME}.so test/test1
+check: ${LIBNAME}.so cudaproxy test/test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
 	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} -i 5 \
 	  --with-plugin $$PWD/${LIBNAME}.so test/test1
