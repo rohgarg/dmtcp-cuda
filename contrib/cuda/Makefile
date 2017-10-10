@@ -31,13 +31,16 @@ DEMO_PORT=7781
 default: ${LIBNAME}.so
 
 vi:
-	vim cuda_plugin.c
+	vim cuda-plugin.c
 
 proxy: cudaproxy.cu
 	nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $<
 
 test1: test/test1.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o test1 test1.cu
+
+test2: test/test2.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o test2 test2.cu
 
 check: ${LIBNAME}.so test/test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
