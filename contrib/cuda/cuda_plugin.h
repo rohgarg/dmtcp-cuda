@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
+#ifndef STANDALONE
 #include "dmtcp.h"
 #include "dmtcp_dlsym.h"
 
@@ -50,32 +51,34 @@ extern int skt_master;
 
 // proxy address
 extern struct sockaddr_un sa_proxy;
+#endif
 
 enum cuda_syscalls
 {
-  CudaMalloc, CudaFree, CudaMallocArray, CudaFreeArray, 
-  CudaMemcpy, CudaHostAlloc, CudaConfigureCall, CudaSetupArgument, 
+  CudaMalloc, CudaFree, CudaMallocArray, CudaFreeArray,
+  CudaMallocManaged,
+  CudaMemcpy, CudaHostAlloc, CudaConfigureCall, CudaSetupArgument,
   CudaLaunch
 };
 
 // the structure for all our cuda system calls
 // so far it's for the following functions
 // cudaMalloc, cudaMallocArray, cudaFree, and cudaMemcpy
-typedef struct 
+typedef struct
 {
   enum cuda_syscalls op;
   union
   {
-    struct 
+    struct
     {
       // the structure takes a deferenced pointer
-      // Since it's the proxy that calls cudaMalloc() 
+      // Since it's the proxy that calls cudaMalloc()
       // &pointer, (void **), will then be passed to cudaMalloc.
       void *pointer;
       size_t size;
     } cuda_malloc;
 
-    struct 
+    struct
     {
       void *pointer;
     } cuda_free;
@@ -83,17 +86,17 @@ typedef struct
     struct
     {
       // the structure takes a deferenced pointer
-      // Since it's the proxy that calls cudaMallocArray() 
+      // Since it's the proxy that calls cudaMallocArray()
       // &array (cudaArray **) will then be passed to cudaMalloc.
       struct cudaArray *array;
       // it's the proxy that will pass &desc to cudaMallocArray()
-      struct cudaChannelFormatDesc desc; 
+      struct cudaChannelFormatDesc desc;
       size_t width;
       size_t height;
       unsigned int flags;
     } cuda_malloc_array;
 
-    struct 
+    struct
     {
       struct cudaArray *array;
     } cuda_free_array;
@@ -105,7 +108,7 @@ typedef struct
       size_t size;
       enum cudaMemcpyKind direction;
     } cuda_memcpy;
-  
+
 //    struct
 //    {
 //      // master and proxy will have different pointer to the shared memory
@@ -114,7 +117,7 @@ typedef struct
 //      size_t size;
 //      unsigned int flags;
 //    } cuda_host_alloc
-    
+
     struct
     {
       int gridDim[3];    // to mimic dim3
@@ -125,7 +128,7 @@ typedef struct
 
     struct
     {
-      const void *arg; // it's used for record. 
+      const void *arg; // it's used for record.
       size_t size;
       size_t offset;
     } cuda_setup_argument;
@@ -140,16 +143,17 @@ typedef struct
     {
       const void *func;
     } cuda_launch_record;
-
   }syscall_type;
   const void *payload;
   size_t payload_size;
 } cudaSyscallStructure;
 
+#ifndef STANDALONE
 void proxy_initialize(void);
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
 void log_append(cudaSyscallStructure record);
 int log_read(cudaSyscallStructure *record);
+#endif
 
 #endif // ifndef  __CUDA_PLUGIN_H
