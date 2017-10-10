@@ -305,7 +305,10 @@ TcpConnection::isBlacklistedTcp(const sockaddr *saddr, socklen_t len)
     }
   } else if (saddr->sa_family == AF_UNIX) {
     struct sockaddr_un *uaddr = (struct sockaddr_un *)saddr;
-    static string blacklist[] = { "" };
+    // Add the cudaproxy socket to the list of blacklisted sockets
+    // We shouldn't try to drain this external connection
+    // FIXME: The name of the socket should be dynamic
+    static string blacklist[] = { "proxy" };
     for (size_t i = 0; blacklist[i] != ""; i++) {
       if (Util::strStartsWith(uaddr->sun_path, blacklist[i].c_str()) ||
           Util::strStartsWith(&uaddr->sun_path[1], blacklist[i].c_str())) {
