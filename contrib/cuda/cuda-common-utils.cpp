@@ -38,10 +38,10 @@ void proxy_initialize(void)
   memset(&sa_proxy, 0, sizeof(sa_proxy));
   strcpy(sa_proxy.sun_path, SKTNAME);
   sa_proxy.sun_family = AF_UNIX;
-  char *const args[] = {"../../bin/dmtcp_nocheckpoint",
-                        "./cudaproxy",
-                        SKTNAME,
-                        NULL};
+  char *const args[] = {const_cast<char*>("../../bin/dmtcp_nocheckpoint"),
+                        const_cast<char*>("./cudaproxy"),
+                        const_cast<char*>(SKTNAME),
+                        NULL}; // FIXME: Compiler warning
 
   switch (_real_fork()) {
     case -1:
@@ -52,7 +52,7 @@ void proxy_initialize(void)
         errExit("execvp");
       }
   }
-  
+
 #if USE_SHM
   // create shared memory
   key_t shmKey;
@@ -65,7 +65,7 @@ void proxy_initialize(void)
   if ((shmID = shmget(shmKey, SHMSIZE, shm_flags)) == -1) {
     errExit("shmget()");
   }
-  
+
   if ((shmaddr = shmat(shmID, NULL, 0)) == (void *)-1) {
     errExit("shmat()");
   }
@@ -84,7 +84,7 @@ void proxy_initialize(void)
       errExit("connect");
     }
   }
-  
+
 #if USE_SHM
   // Send the shmID to the proxy
   int realId = dmtcp_virtual_to_real_shmid(shmID);

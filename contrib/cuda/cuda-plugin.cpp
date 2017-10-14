@@ -75,13 +75,15 @@ restart()
     perror("open()");
     exit(EXIT_FAILURE);
   }
-  cudaSyscallStructure rec = {0};
+  cudaSyscallStructure rec;
+  memset(&rec, 0, sizeof(rec));
   // Replay calls from the log
   int ret = log_read(&rec);
   while (ret) {
     // TODO: Add cases for other calls
     if (rec.op == CudaMalloc) {
-      cudaMalloc(rec.syscall_type.cuda_malloc.pointer, rec.syscall_type.cuda_malloc.size);
+      cudaMalloc((void**)rec.syscall_type.cuda_malloc.pointer,
+                 rec.syscall_type.cuda_malloc.size);
     }
     ret = log_read(&rec);
   }

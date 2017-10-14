@@ -10,7 +10,8 @@
 #include "cuda_plugin.h"
 
 // 1.
-cudaError_t cudaMalloc(void **pointer, size_t size)
+EXTERNC cudaError_t
+cudaMalloc(void **pointer, size_t size)
 {
   if (!initialized)
     proxy_initialize();
@@ -37,12 +38,13 @@ cudaError_t cudaMalloc(void **pointer, size_t size)
   strce_to_send.syscall_type.cuda_malloc.size = size;
 
   log_append(strce_to_send);
-	
+
   return ret_val;
 }
 
 // 2.
-cudaError_t cudaFree(void *pointer)
+EXTERNC cudaError_t
+cudaFree(void *pointer)
 {
   if (!initialized)
     proxy_initialize();
@@ -66,8 +68,9 @@ cudaError_t cudaFree(void *pointer)
 }
 
 // 3.
-cudaError_t cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
-  enum cudaMemcpyKind direction)
+EXTERNC cudaError_t
+cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
+           enum cudaMemcpyKind direction)
 {
   if (!initialized)
     proxy_initialize();
@@ -91,7 +94,7 @@ cudaError_t cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
       return ret_val;
     }
 
-    
+
     case cudaMemcpyHostToDevice:
       strce_to_send.payload = pointer2;
       strce_to_send.payload_size = size;
@@ -158,8 +161,9 @@ cudaError_t cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 }
 
 // 4.
-cudaError_t cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,
-                          size_t width, size_t height, unsigned int flags)
+EXTERNC cudaError_t
+cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,
+                size_t width, size_t height, unsigned int flags)
 {
   if (!initialized)
     proxy_initialize();
@@ -196,7 +200,8 @@ cudaError_t cudaMallocArray(struct cudaArray **array, const struct cudaChannelFo
 }
 
 // 5.
-cudaError_t cudaFreeArray(struct cudaArray *array)
+EXTERNC cudaError_t
+cudaFreeArray(struct cudaArray *array)
 {
   if (!initialized)
     proxy_initialize();
@@ -224,7 +229,7 @@ cudaError_t cudaFreeArray(struct cudaArray *array)
 //{
 //	if (!initialized)
 //		proxy_initialize();
-//	
+//
 //	cudaSyscallStructure strce_to_send, rcvd_strce;
 //  int ret_val;
 //
@@ -235,14 +240,14 @@ cudaError_t cudaFreeArray(struct cudaArray *array)
 //
 //	//
 //	send_recv(skt_master, &strce_to_send, &rcv_strce, &ret_val);
-//	
+//
 //	// receive shmid
 //	int shmid;
 //	if (read(skt_master, &shmid, sizeof(int)) == -1)
 //	{
 //		perror("read()");
 //		exit(EXIT_SUCCESS);
-//	}	
+//	}
 //
 //	// attach the shared memory
 //	void *addr;
@@ -258,7 +263,7 @@ cudaError_t cudaFreeArray(struct cudaArray *array)
 //	strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
 //	strce_to_send.syscall_type.cuda_host_alloc.size = size;
 //	strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
-//	
+//
 //	// change pHost to point to the shared memory
 //	*pHost = addr;
 //
@@ -268,7 +273,8 @@ cudaError_t cudaFreeArray(struct cudaArray *array)
 
 
 //
-cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t stream)
+EXTERNC cudaError_t
+cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t stream)
 {
   if (!initialized)
     proxy_initialize();
@@ -287,14 +293,15 @@ cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem, cud
   strce_to_send.syscall_type.cuda_configure_call.stream = stream;
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-  
+
   log_append(strce_to_send);
-	
+
   return ret_val;
 }
 
 //
-cudaError_t cudaSetupArgument(const void *arg, size_t size, size_t offset)
+EXTERNC cudaError_t
+cudaSetupArgument(const void *arg, size_t size, size_t offset)
 {
 
 
@@ -315,7 +322,7 @@ cudaError_t cudaSetupArgument(const void *arg, size_t size, size_t offset)
   strce_to_send.payload_size = size;
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-  
+
   memset(&strce_to_send, 0, sizeof(strce_to_send));
   strce_to_send.op = CudaSetupArgument;
   strce_to_send.syscall_type.cuda_setup_argument.arg = arg;
@@ -323,12 +330,13 @@ cudaError_t cudaSetupArgument(const void *arg, size_t size, size_t offset)
   strce_to_send.syscall_type.cuda_setup_argument.offset = offset;
 
   log_append(strce_to_send);
-	
+
   return ret_val;
 }
 
 //
-cudaError_t cudaLaunch(const void *func)
+EXTERNC cudaError_t
+cudaLaunch(const void *func)
 {
   if (!initialized)
     proxy_initialize();
@@ -339,11 +347,11 @@ cudaError_t cudaLaunch(const void *func)
   strce_to_send.op = CudaLaunch;
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-  
+
   memset(&strce_to_send, 0, sizeof(strce_to_send));
   strce_to_send.op = CudaLaunch;
 
   log_append(strce_to_send);
-	
+
   return ret_val;
 }
