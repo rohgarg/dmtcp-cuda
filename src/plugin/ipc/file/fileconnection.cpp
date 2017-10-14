@@ -74,6 +74,7 @@ _isBlacklistedFile(string &path)
   if ((Util::strStartsWith(path, "/dev/") &&
        !Util::strStartsWith(path, "/dev/shm/")) ||
       Util::strStartsWith(path, "/proc/") ||
+      Util::strStartsWith(path, "anon_inode:[userfaultfd]") ||
       Util::strStartsWith(path, dmtcp_get_tmpdir())) {
     return true;
   }
