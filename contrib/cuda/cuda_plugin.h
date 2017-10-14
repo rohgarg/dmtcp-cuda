@@ -6,6 +6,7 @@
 #include <cuda_runtime_api.h>
 
 #ifndef STANDALONE
+#include "jassert.h"
 #include "dmtcp.h"
 #include "dmtcp_dlsym.h"
 
@@ -153,7 +154,7 @@ void proxy_initialize(void);
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
 void log_append(cudaSyscallStructure record);
-int log_read(cudaSyscallStructure *record);
+bool log_read(cudaSyscallStructure *record);
 #endif
 
 #endif // ifndef  __CUDA_PLUGIN_H

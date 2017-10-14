@@ -22,7 +22,7 @@ cuda_event_hook(DmtcpEvent_t event, DmtcpEventData_t *data)
   switch (event) {
   case DMTCP_EVENT_INIT:
   {
-    DPRINTF("The plugin containing %s has been initialized.\n", __FILE__);
+    JTRACE("The CUDA plugin has been initialized.");
     // create the log file
     logFd = open(LOGFILE, O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
     if (logFd == -1)
@@ -40,7 +40,7 @@ cuda_event_hook(DmtcpEvent_t event, DmtcpEventData_t *data)
     break;
   }
   case DMTCP_EVENT_EXIT:
-    DPRINTF("The plugin is being called before exiting.\n");
+    JTRACE("The plugin is being called before exiting.");
     break;
   default:
     break;
@@ -54,20 +54,20 @@ cuda_event_hook(DmtcpEvent_t event, DmtcpEventData_t *data)
 static void
 pre_ckpt()
 {
-  DPRINTF("Nothing to do for now\n");
+  JTRACE("Nothing to do for now");
 }
 
 static void
 resume()
 {
-  DPRINTF("Nothing to do for now\n");
+  JTRACE("Nothing to do for now");
 }
 
 
 static void
 restart()
 {
-  DPRINTF("Trying to re-init the CUDA driver\n");
+  JTRACE("Trying to re-init the CUDA driver");
   proxy_initialize();
   logFd = open(LOGFILE, O_APPEND|O_RDWR);
   if (logFd == -1)
@@ -78,7 +78,7 @@ restart()
   cudaSyscallStructure rec;
   memset(&rec, 0, sizeof(rec));
   // Replay calls from the log
-  int ret = log_read(&rec);
+  bool ret = log_read(&rec);
   while (ret) {
     // TODO: Add cases for other calls
     if (rec.op == CudaMalloc) {
@@ -103,7 +103,8 @@ cudaMalloc(void **devPtr, size_t  size)
 }
 
 cudaError_t
-cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t stream)
+cudaConfigureCall(dim3 gridDim, dim3 blockDim,
+                  size_t sharedMem, cudaStream_t stream)
 {
   return _real_cudaConfigureCall(gridDim, blockDim, sharedMem, stream);
 }
@@ -121,9 +122,11 @@ cudaSetupArgument(const void *arg, size_t size, size_t offset)
 }
 
 cudaError_t
-cudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream)
+cudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim,
+                 void** args, size_t sharedMem, cudaStream_t stream)
 {
-  return _real_cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream);
+  return _real_cudaLaunchKernel(func, gridDim, blockDim,
+                                args, sharedMem, stream);
 }
 
 cudaError_t
