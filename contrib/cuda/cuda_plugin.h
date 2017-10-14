@@ -6,6 +6,8 @@
 #include <cuda_runtime_api.h>
 
 #ifndef STANDALONE
+#include <stdint.h>
+
 #include "jassert.h"
 #include "dmtcp.h"
 #include "dmtcp_dlsym.h"
@@ -44,8 +46,10 @@
 #define SHMSIZE 128
 
 extern int initialized;
+extern int ufd_initialized;
 extern void *shmaddr;
 extern int logFd;
+extern int page_size;
 
 // master socket
 extern int skt_master;
@@ -57,9 +61,10 @@ extern struct sockaddr_un sa_proxy;
 enum cuda_syscalls
 {
   CudaMalloc, CudaFree, CudaMallocArray, CudaFreeArray,
-  CudaMallocManaged,
+  CudaMallocManaged, CudaMallocManagedMemcpy,
   CudaMemcpy, CudaHostAlloc, CudaConfigureCall, CudaSetupArgument,
-  CudaLaunch
+  CudaLaunch,
+  CudaDeviceSync,
 };
 
 // the structure for all our cuda system calls
@@ -110,6 +115,14 @@ typedef struct
       enum cudaMemcpyKind direction;
     } cuda_memcpy;
 
+    struct
+    {
+      void *destination;
+      const void *source;
+      size_t size;
+      enum cudaMemcpyKind direction;
+    } cuda_managed_memcpy;
+
 //    struct
 //    {
 //      // master and proxy will have different pointer to the shared memory
@@ -134,7 +147,6 @@ typedef struct
       size_t offset;
     } cuda_setup_argument;
 
-
     struct
     {
       int shmId;
@@ -150,11 +162,24 @@ typedef struct
 } cudaSyscallStructure;
 
 #ifndef STANDALONE
+
+static inline void*
+getAlignedAddress(uintptr_t ptr, size_t alignment)
+{
+  const size_t mask = alignment - 1;
+  return (void *) (ptr & ~mask);
+}
+
 void proxy_initialize(void);
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
 void log_append(cudaSyscallStructure record);
 bool log_read(cudaSyscallStructure *record);
+
+void userfaultfd_initialize(void);
+void* create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo = NULL);
+dmtcp::map<void*, void*>& shadowPageMap();
+
 #endif
 
 #endif // ifndef  __CUDA_PLUGIN_H

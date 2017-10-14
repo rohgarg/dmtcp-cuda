@@ -114,8 +114,21 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
          (JASSERT_ERRNO);
 
   if (strce_to_send->payload) {
-    JASSERT(write(fd, strce_to_send->payload, strce_to_send->payload_size) !=
-            -1)(JASSERT_ERRNO);
+    // FIXME: Ugly hack to detect if it's a pointer on a 64-bit system
+    if (strce_to_send->payload_size == 8) {
+      void *origPtr = (void*)*(unsigned long*)strce_to_send->payload;
+      void *dataPage = getAlignedAddress((uintptr_t)origPtr,
+                                         page_size > 0 ? page_size : 4096);
+      void *payload = NULL;
+      if (shadowPageMap().find(dataPage) != shadowPageMap().end()) {
+        payload = (void*)((uintptr_t)shadowPageMap()[dataPage] +
+                          ((uintptr_t)origPtr -(uintptr_t)dataPage));
+      }
+      JASSERT(write(fd, &payload, sizeof(payload)) != -1)(JASSERT_ERRNO);
+    } else {
+      JASSERT(write(fd, strce_to_send->payload, strce_to_send->payload_size) !=
+              -1)(JASSERT_ERRNO);
+    }
   }
 
   // receive the result
