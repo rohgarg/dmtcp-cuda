@@ -16,9 +16,6 @@
 # include <sys/shm.h>
 #endif
 
-#define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
-                        } while (0)
-
 #include "cuda_plugin.h"
 
 int initialized = False;
@@ -45,52 +42,42 @@ void proxy_initialize(void)
 
   switch (_real_fork()) {
     case -1:
-      errExit("fork()");
+      JASSERT(false)(JASSERT_ERRNO).Text("Failed to fork cudaproxy");
 
     case 0:
-      if (execvp((const char*)args[0], args) == -1) {
-        errExit("execvp");
-      }
+      JASSERT(execvp((const char*)args[0], args) != -1)(JASSERT_ERRNO)
+             .Text("Failed to exec cudaproxy");
   }
 
 #if USE_SHM
   // create shared memory
   key_t shmKey;
-  if ((shmKey = ftok(".", 1) == -1)) {
-    errExit("ftok()");
-  }
+  JASSERT((shmKey = ftok(".", 1) != -1)(JASSERT_ERRNO);
 
   int shm_flags = IPC_CREAT | 0666;
   int shmID;
-  if ((shmID = shmget(shmKey, SHMSIZE, shm_flags)) == -1) {
-    errExit("shmget()");
-  }
+  JASSERT((shmID = shmget(shmKey, SHMSIZE, shm_flags)) != -1)(JASSERT_ERRNO);
 
-  if ((shmaddr = shmat(shmID, NULL, 0)) == (void *)-1) {
-    errExit("shmat()");
-  }
+  JASSERT((shmaddr = shmat(shmID, NULL, 0)) != (void *)-1)(JASSERT_ERRNO);
 #endif
 
   // connect to the proxy:server
-  if ((skt_master = socket(AF_UNIX, SOCK_STREAM, 0)) == 1) {
-    errExit("socket()");
-  }
+  JASSERT((skt_master = socket(AF_UNIX, SOCK_STREAM, 0)) > 0)(JASSERT_ERRNO);
 
-  while (connect(skt_master, (struct sockaddr *)&sa_proxy, sizeof(sa_proxy)) == -1) {
+  while (connect(skt_master, (struct sockaddr *)&sa_proxy, sizeof(sa_proxy))
+         == -1) {
     if (errno = ENOENT) {
       sleep(1);
       continue;
     } else {
-      errExit("connect");
+      JASSERT(false)(JASSERT_ERRNO).Text("Failed to connect with proxy");
     }
   }
 
 #if USE_SHM
   // Send the shmID to the proxy
   int realId = dmtcp_virtual_to_real_shmid(shmID);
-  if (write(skt_master, &realId, sizeof(shmID)) == -1) {
-    errExit("write()");
-  }
+  JASSERT(write(skt_master, &realId, sizeof(shmID)) != -1)(JASSERT_ERRNO);
 #endif
 
   initialized = True;
@@ -100,21 +87,19 @@ void proxy_initialize(void)
 // append a cuda system call structure to it
 void log_append(cudaSyscallStructure record)
 {
-  if (write(logFd, &record, sizeof(record)) == -1) {
-    errExit("write()");
-  }
+  JASSERT(write(logFd, &record, sizeof(record)) != -1)(JASSERT_ERRNO);
 }
 
-int log_read(cudaSyscallStructure *record)
+bool log_read(cudaSyscallStructure *record)
 {
   int ret = read(logFd, record, sizeof(*record));
   if (ret == -1) {
-    errExit("write()");
+    JASSERT(false)(JASSERT_ERRNO);
   }
   if (ret == 0 || ret < sizeof(*record)) {
-    return False;
+    return false;
   }
-  return True;
+  return true;
 }
 
 /*
@@ -122,33 +107,24 @@ int log_read(cudaSyscallStructure *record)
   It then receives the return value and gets the structure back.
 */
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
-              cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val)
+               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val)
 {
-   // send the structure
-  if (write(fd, strce_to_send, sizeof(cudaSyscallStructure)) == -1) {
-    errExit("write()");
-  }
+  // send the structure
+  JASSERT(write(fd, strce_to_send, sizeof(cudaSyscallStructure)) != -1)
+         (JASSERT_ERRNO);
 
   if (strce_to_send->payload) {
-    if (write(fd, strce_to_send->payload, strce_to_send->payload_size) == -1) {
-      errExit("write()");
-    }
+    JASSERT(write(fd, strce_to_send->payload, strce_to_send->payload_size) !=
+            -1)(JASSERT_ERRNO);
   }
 
-   // receive the result
-  if (read(fd, ret_val, sizeof(int)) == -1) {
-    errExit("read()");
-  }
+  // receive the result
+  JASSERT(read(fd, ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
 
-  if ((*ret_val) != cudaSuccess)
-  {
-    DPRINTF("cuda syscall failed\n");
-    exit(EXIT_FAILURE);
-  }
+  JASSERT((*ret_val) == cudaSuccess).Text("CUDA syscall failed");
 
   // get the structure back
   memset(rcvd_strce, 0, sizeof(cudaSyscallStructure));
-  if (read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) == -1) {
-    errExit("read()");
-  }
+  JASSERT(read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) != -1)
+         (JASSERT_ERRNO);
 }

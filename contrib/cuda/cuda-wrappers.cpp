@@ -86,7 +86,7 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 
   switch(direction)
   {
-    printf("cudaMemcpy(): lib\n");
+    JTRACE("cudaMemcpy(): lib");
 
     case cudaMemcpyHostToHost:
     {
@@ -103,40 +103,23 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 
     case cudaMemcpyDeviceToHost:
       // send the structure
-      if (write(skt_master, &strce_to_send, sizeof(strce_to_send)) == -1)
-      {
-        perror("write()");
-        exit(EXIT_FAILURE);
-      }
+      JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
+             (JASSERT_ERRNO);
 
       // get the payload: part of the GPU computation actually
-      if (read(skt_master, pointer1, size) == -1)
-      {
-        perror("read()");
-        exit(EXIT_FAILURE);
-      }
+      JASSERT(read(skt_master, pointer1, size) != -1)(JASSERT_ERRNO);
 
       // receive the result
       memset(&ret_val, 0, sizeof(ret_val));
-      if (read(skt_master, &ret_val, sizeof(ret_val)) == -1)
-      {
-        perror("read()");
-        exit(EXIT_FAILURE);
-      }
 
-      if (ret_val != cudaSuccess)
-      {
-        printf("cudaMemcpy failed\n");
-        exit(EXIT_FAILURE);
-      }
+      JASSERT(read(skt_master, &ret_val, sizeof(ret_val)) != -1)(JASSERT_ERRNO);
+
+      JASSERT(ret_val == cudaSuccess).Text("cudaMemcpy failed");
 
       // get the structure back
       memset(&rcvd_strce, 0, sizeof(rcvd_strce));
-      if (read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) == -1)
-      {
-        perror("read()");
-        exit(EXIT_FAILURE);
-      }
+      JASSERT(read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) != -1)
+             (JASSERT_ERRNO);
       break;
 
     case cudaMemcpyDeviceToDevice:
@@ -145,8 +128,7 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
       break;
 
     default:
-      printf("bad direction value %d\n", direction);
-      exit(EXIT_FAILURE);
+      JASSERT(false)(direction).Text("Unknown direction for memcpy");
   }
 
   memset(&strce_to_send, 0, sizeof(strce_to_send));
@@ -162,7 +144,8 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 
 // 4.
 EXTERNC cudaError_t
-cudaMallocArray(struct cudaArray **array, const struct cudaChannelFormatDesc *desc,
+cudaMallocArray(struct cudaArray **array,
+                const struct cudaChannelFormatDesc *desc,
                 size_t width, size_t height, unsigned int flags)
 {
   if (!initialized)
@@ -210,7 +193,7 @@ cudaFreeArray(struct cudaArray *array)
   cudaError_t ret_val;
 
   strce_to_send.op = CudaFreeArray;
-  strce_to_send.syscall_type.cuda_free_array.array= array;
+  strce_to_send.syscall_type.cuda_free_array.array = array;
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
@@ -224,57 +207,60 @@ cudaFreeArray(struct cudaArray *array)
 }
 
 
+#if 0
 // 6.
-//void cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
-//{
-//	if (!initialized)
-//		proxy_initialize();
-//
-//	cudaSyscallStructure strce_to_send, rcvd_strce;
-//  int ret_val;
-//
-//	strce_to_send.op = CudaHostAlloc;
-//	strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
-//	strce_to_send.syscall_type.cuda_host_alloc.size = size;
-//	strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
-//
-//	//
-//	send_recv(skt_master, &strce_to_send, &rcv_strce, &ret_val);
-//
-//	// receive shmid
-//	int shmid;
-//	if (read(skt_master, &shmid, sizeof(int)) == -1)
-//	{
-//		perror("read()");
-//		exit(EXIT_SUCCESS);
-//	}
-//
-//	// attach the shared memory
-//	void *addr;
-//	if ((addr = shmat(shmid, NULL, 0)) == -1)
-//	{
-//		perror("shmat()");
-//		exit(EXIT_FAILURE);
-//	}
-//	//
-//
-//	memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-//	strce_to_send.op = CudaHostAlloc;
-//	strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
-//	strce_to_send.syscall_type.cuda_host_alloc.size = size;
-//	strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
-//
-//	// change pHost to point to the shared memory
-//	*pHost = addr;
-//
-//	// record this function call
-//	log_append(strce_to_send);
-//}
+void cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  int ret_val;
+
+  strce_to_send.op = CudaHostAlloc;
+  strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
+  strce_to_send.syscall_type.cuda_host_alloc.size = size;
+  strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
+
+  //
+  send_recv(skt_master, &strce_to_send, &rcv_strce, &ret_val);
+
+  // receive shmid
+  int shmid;
+  if (read(skt_master, &shmid, sizeof(int)) == -1)
+  {
+    perror("read()");
+    exit(EXIT_SUCCESS);
+  }
+
+  // attach the shared memory
+  void *addr;
+  if ((addr = shmat(shmid, NULL, 0)) == -1)
+  {
+    perror("shmat()");
+    exit(EXIT_FAILURE);
+  }
+  //
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaHostAlloc;
+  strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
+  strce_to_send.syscall_type.cuda_host_alloc.size = size;
+  strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
+
+  // change pHost to point to the shared memory
+  *pHost = addr;
+
+  // record this function call
+  log_append(strce_to_send);
+}
+#endif
 
 
 //
 EXTERNC cudaError_t
-cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t stream)
+cudaConfigureCall(dim3 gridDim, dim3 blockDim,
+                  size_t sharedMem, cudaStream_t stream)
 {
   if (!initialized)
     proxy_initialize();
@@ -303,8 +289,6 @@ cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t st
 EXTERNC cudaError_t
 cudaSetupArgument(const void *arg, size_t size, size_t offset)
 {
-
-
   if (!initialized)
     proxy_initialize();
 
