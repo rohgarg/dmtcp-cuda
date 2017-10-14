@@ -30,6 +30,11 @@ __global__ void add(int a, int b, int *c)
    *c = a+b;
 }
 
+__global__ void add_2_1(int a, int b, int *c)
+{
+	*c = a + b;
+}
+
 int main(int argc, char **argv)
 {
   // set up the server
@@ -126,15 +131,42 @@ int compute(int fd, cudaSyscallStructure *structure)
   switch (op)
   {
     //
+    case CudaDeviceSync:
+      return_val = cudaDeviceSynchronize();
+      break;
+
     case CudaMalloc:
       return_val = cudaMalloc(&((structure->syscall_type).cuda_malloc.pointer),
         (structure->syscall_type).cuda_malloc.size);
       break;
 
+    case CudaMallocManaged:
+      return_val =
+          cudaMallocManaged(&((structure->syscall_type).cuda_malloc.pointer),
+                            (structure->syscall_type).cuda_malloc.size);
+      break;
 
     case CudaFree:
       return_val = cudaFree((structure->syscall_type).cuda_free.pointer);
       break;
+
+    case CudaMallocManagedMemcpy:
+      switch (direction) {
+        case cudaMemcpyDeviceToHost:
+          // send data to the master
+          if (write(fd,
+                    (structure->syscall_type).cuda_memcpy.source,
+                    (structure->syscall_type).cuda_memcpy.size) == -1) {
+            perror("write()");
+            exit(EXIT_FAILURE);
+          }
+
+          break;
+
+        default:
+          printf("bad direction value: %d\n", direction);
+          exit(EXIT_FAILURE);
+      }
 
     //
     case CudaMemcpy:
@@ -257,7 +289,8 @@ int compute(int fd, cudaSyscallStructure *structure)
 
     case CudaLaunch:
     {
-      return_val = cudaLaunch(add);
+      // return_val = cudaLaunch(add);
+      return_val = cudaLaunch(add_2_1);
       break; 
     }
 

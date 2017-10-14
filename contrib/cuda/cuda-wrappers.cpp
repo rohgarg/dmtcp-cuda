@@ -339,3 +339,25 @@ cudaLaunch(const void *func)
 
   return ret_val;
 }
+
+EXTERNC cudaError_t
+cudaDeviceSynchronize(void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  cudaError_t ret_val;
+
+  strce_to_send.op = CudaDeviceSync;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  strce_to_send.op = CudaDeviceSync;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}

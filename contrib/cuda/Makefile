@@ -7,7 +7,7 @@ NAME=${shell basename $$PWD}
 LIBNAME=libdmtcp_${NAME}
 
 # As you add new files to your hijack library, add the object file names here.
-LIBOBJS = cuda-plugin.o cuda-wrappers.o cuda-common-utils.o
+LIBOBJS = cuda-plugin.o cuda-wrappers.o cuda-common-utils.o cuda-uvm-utils.o cuda-uvm-wrappers.o
 
 CC=nvcc
 CXX=nvcc
@@ -31,16 +31,19 @@ DEMO_PORT=7781
 default: ${LIBNAME}.so
 
 vi:
-	vim cuda-plugin.c
+	vim cuda-plugin.cpp
 
 cudaproxy: cudaproxy.cu
 	nvcc -cudart shared -DSTANDALONE -I. -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $<
 
 test1: test/test1.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o test1 test1.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
 
 test2: test/test2.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o test2 test2.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+
+test2.1: test/test2.1.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
 
 check: ${LIBNAME}.so cudaproxy test/test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
