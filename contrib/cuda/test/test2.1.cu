@@ -16,6 +16,7 @@ int main(int argc, char **argv)
   cudaMallocManaged(&c, sizeof(int));
   a = 2;
   b = 3;
+  sleep(10); // Allow time to checkpoint
   add_2_1<<<1,1>>>(a, b, c);
   cudaDeviceSynchronize();
 
