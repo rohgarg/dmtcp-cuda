@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include "cuda_plugin.h"
+#include "util.h"
 
 // Public global vars
 
@@ -249,6 +250,36 @@ userfaultfd_initialize(void)
     errno = s;
     JASSERT(s == 0)(JASSERT_ERRNO);
   }
+
+  ufd_initialized = True;
+}
+
+void
+reset_uffd(void)
+{
+  JASSERT(ufd_initialized && page_size > 0);
+
+  struct uffdio_api uffdio_api;
+  int old_uffd = uffd;
+
+  uffd = syscall(__NR_userfaultfd, O_CLOEXEC | O_NONBLOCK);
+
+  JASSERT(uffd != -1)(JASSERT_ERRNO);
+
+  JTRACE("Restoring uffd")(uffd)(old_uffd);
+
+  if (uffd != old_uffd) {
+    uffd = dmtcp::Util::changeFd(uffd, old_uffd);
+    JASSERT(uffd == old_uffd)(JASSERT_ERRNO);
+    JTRACE("Restored uffd")(uffd)(old_uffd);
+  }
+
+  uffdio_api.api = UFFD_API;
+  uffdio_api.features = 0;
+
+  JASSERT(ioctl(uffd, UFFDIO_API, &uffdio_api) != -1)(JASSERT_ERRNO);
+
+  JTRACE("ufd features")((void*)uffdio_api.features);
 
   ufd_initialized = True;
 }
