@@ -55,12 +55,14 @@ static void
 pre_ckpt()
 {
   JTRACE("Nothing to do for now");
+  unregister_all_pages();
 }
 
 static void
 resume()
 {
   JTRACE("Nothing to do for now");
+  register_all_pages();
 }
 
 

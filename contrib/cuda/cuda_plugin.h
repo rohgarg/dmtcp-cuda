@@ -56,7 +56,7 @@ extern int skt_master;
 
 // proxy address
 extern struct sockaddr_un sa_proxy;
-#endif
+#endif // ifndef STANDALONE
 
 enum cuda_syscalls
 {
@@ -178,8 +178,11 @@ bool log_read(cudaSyscallStructure *record);
 
 void userfaultfd_initialize(void);
 void* create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo = NULL);
+void unregister_all_pages();
+void register_all_pages();
+
 dmtcp::map<void*, void*>& shadowPageMap();
 
-#endif
+#endif // ifndef STANDALONE
 
 #endif // ifndef  __CUDA_PLUGIN_H

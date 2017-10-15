@@ -28,6 +28,11 @@ int page_size = -1;
 
 static int uffd = -1;
 
+struct ShadowRegion {
+  void *addr;
+  size_t len;
+};
+
 // Private functions
 
 dmtcp::map<void*, void*>&
@@ -37,6 +42,17 @@ shadowPageMap()
   if (instance == NULL) {
     void *buffer = JALLOC_MALLOC(1024 * 1024);
     instance = new (buffer)dmtcp::map<void*, void*>();
+  }
+  return *instance;
+}
+
+static dmtcp::vector<ShadowRegion>&
+allShadowRegions()
+{
+  static dmtcp::vector<ShadowRegion> *instance = NULL;
+  if (instance == NULL) {
+    void *buffer = JALLOC_MALLOC(1024 * 1024);
+    instance = new (buffer)dmtcp::vector<ShadowRegion>();
   }
   return *instance;
 }
@@ -95,7 +111,7 @@ fault_handler_thread(void *arg)
 
     JTRACE("fault_handler_thread():");
     JTRACE("    poll() returns") (nready)
-          ((pollfd.revents & POLLIN))
+          ((pollfd.revents & POLLIN) != 0)
           ((pollfd.revents & POLLERR) != 0);
 
     /* Read an event from the userfaultfd */
@@ -150,18 +166,61 @@ monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
 {
   struct uffdio_register uffdio_register;
 
-  uffdio_register.range.start = (unsigned long) addr;
+  uffdio_register.range.start = (uintptr_t)addr;
   uffdio_register.range.len = size;
   uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
+
+  JTRACE("register region")(addr)(size);
 
   JASSERT(ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) != -1)(JASSERT_ERRNO);
 
   if (remoteInfo) {
+    // Save the location and size of the shadow region
+    ShadowRegion r =  {.addr = addr, .len = size};
+    allShadowRegions().push_back(r);
+    // Save the actual UVM region on the proxy
     shadowPageMap()[addr] = remoteInfo->syscall_type.cuda_malloc.pointer;
   }
 }
 
 // Public functions
+
+void
+unregister_all_pages()
+{
+  struct uffdio_range uffdio_range;
+
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    uffdio_range.start = (uintptr_t)it->addr;
+    uffdio_range.len = it->len;
+    JTRACE("unregister region")(it->addr)(it->len);
+
+    JASSERT(ioctl(uffd, UFFDIO_UNREGISTER, &uffdio_range) != -1)(JASSERT_ERRNO);
+  }
+}
+
+void
+register_all_pages()
+{
+  struct uffdio_register uffdio_register;
+
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    /*
+     * NOTE: For some reason, uffd doesn't re-register the page, without
+     *       first munmaping it!  Arguably, this is a kernel bug.
+     *
+     * FIXME: We need to copy/restore the data on these pages
+     */
+    JASSERT(munmap(it->addr, it->len) == 0)(JASSERT_ERRNO);
+    void *addr = mmap(it->addr, it->len, PROT_READ | PROT_WRITE,
+                      MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    JASSERT(addr != MAP_FAILED)(JASSERT_ERRNO);
+    monitor_pages(it->addr, it->len);
+  }
+}
 
 void
 userfaultfd_initialize(void)
