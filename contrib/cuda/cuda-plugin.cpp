@@ -54,14 +54,12 @@ cuda_event_hook(DmtcpEvent_t event, DmtcpEventData_t *data)
 static void
 pre_ckpt()
 {
-  JTRACE("Nothing to do for now");
   unregister_all_pages();
 }
 
 static void
 resume()
 {
-  JTRACE("Nothing to do for now");
   register_all_pages();
 }
 
@@ -70,7 +68,10 @@ static void
 restart()
 {
   JTRACE("Trying to re-init the CUDA driver");
+  close(skt_master);
   proxy_initialize();
+  reset_uffd();
+  register_all_pages();
   logFd = open(LOGFILE, O_APPEND|O_RDWR);
   if (logFd == -1)
   {
@@ -86,6 +87,9 @@ restart()
     if (rec.op == CudaMalloc) {
       cudaMalloc((void**)rec.syscall_type.cuda_malloc.pointer,
                  rec.syscall_type.cuda_malloc.size);
+    } else if (rec.op == CudaMallocManaged) {
+      cudaMallocManaged((void**)rec.syscall_type.cuda_malloc.pointer,
+                        rec.syscall_type.cuda_malloc.size);
     }
     ret = log_read(&rec);
   }

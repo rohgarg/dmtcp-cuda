@@ -177,6 +177,7 @@ void log_append(cudaSyscallStructure record);
 bool log_read(cudaSyscallStructure *record);
 
 void userfaultfd_initialize(void);
+void reset_uffd(void);
 void* create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo = NULL);
 void unregister_all_pages();
 void register_all_pages();
