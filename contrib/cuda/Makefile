@@ -14,7 +14,7 @@ CXX=nvcc
 
 # Modify if your DMTCP_ROOT is located elsewhere.
 ifndef DMTCP_ROOT
-  DMTCP_ROOT=../../
+  DMTCP_ROOT=../..
 endif
 DMTCP_INCLUDE=${DMTCP_ROOT}/include
 JALIB_INCLUDE=${DMTCP_ROOT}/jalib/
@@ -45,6 +45,12 @@ test2: test/test2.cu
 test2.1: test/test2.1.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
 
+run: ${LIBNAME}.so cudaproxy test2.1
+	../../bin/dmtcp_launch -j  --with-plugin ./libdmtcp_cuda.so test/test2.1
+
+restart:
+	../../bin/dmtcp_restart -j ckpt*.dmtcp
+
 check: ${LIBNAME}.so cudaproxy test/test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
 	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} -i 5 \
@@ -60,10 +66,10 @@ ${LIBNAME}.so: ${LIBOBJS}
 	${CXX} ${CXXFLAGS} -o $@ $<
 
 tidy:
-	rm -f *~ .*.swp dmtcp_restart_script*.sh ckpt_*.dmtcp
+	rm -f *~ .*.swp dmtcp_restart_script*.sh ckpt_*.dmtcp cudaSysCallsLog
 
 clean:
-	rm -f ${LIBOBJS} ${LIBNAME}.so test2
+	rm -f ${LIBOBJS} ${LIBNAME}.so test2 test/test2.1 cudaproxy cudaSysCallsLog
 
 distclean: clean
 	rm -f ${LIBNAME}.so *~ .*.swp dmtcp_restart_script*.sh ckpt_*.dmtcp
