@@ -45,8 +45,14 @@ test2: test/test2.cu
 test2.1: test/test2.1.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
 
-run: ${LIBNAME}.so cudaproxy test2.1
+test7: test/test7.cu
+		cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+
+run2.1: ${LIBNAME}.so cudaproxy test2.1
 	../../bin/dmtcp_launch -j  --with-plugin ./libdmtcp_cuda.so test/test2.1
+
+run7: ${LIBNAME}.so cudaproxy test7
+	../../bin/dmtcp_launch -j  --with-plugin ./libdmtcp_cuda.so test/test7
 
 restart:
 	../../bin/dmtcp_restart -j ckpt*.dmtcp
