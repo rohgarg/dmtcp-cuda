@@ -52,6 +52,9 @@ cudaFree(void *pointer)
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
 
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
   strce_to_send.op = CudaFree;
   strce_to_send.syscall_type.cuda_free.pointer = pointer;
 
@@ -77,6 +80,9 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val = cudaSuccess;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
 
   strce_to_send.op = CudaMemcpy;
   strce_to_send.syscall_type.cuda_memcpy.destination = pointer1;
@@ -114,7 +120,7 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 
       JASSERT(read(skt_master, &ret_val, sizeof(ret_val)) != -1)(JASSERT_ERRNO);
 
-      JASSERT(ret_val == cudaSuccess).Text("cudaMemcpy failed");
+      JASSERT(ret_val == cudaSuccess)(ret_val).Text("cudaMemcpy failed");
 
       // get the structure back
       memset(&rcvd_strce, 0, sizeof(rcvd_strce));
@@ -154,6 +160,9 @@ cudaMallocArray(struct cudaArray **array,
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
 
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
   strce_to_send.op = CudaMallocArray;
   strce_to_send.syscall_type.cuda_malloc_array.array = *array;
   strce_to_send.syscall_type.cuda_malloc_array.desc = *desc;
@@ -191,6 +200,9 @@ cudaFreeArray(struct cudaArray *array)
 
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
 
   strce_to_send.op = CudaFreeArray;
   strce_to_send.syscall_type.cuda_free_array.array = array;
@@ -268,6 +280,9 @@ cudaConfigureCall(dim3 gridDim, dim3 blockDim,
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
 
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
   strce_to_send.op = CudaConfigureCall;
   strce_to_send.syscall_type.cuda_configure_call.gridDim[0] = gridDim.x;
   strce_to_send.syscall_type.cuda_configure_call.gridDim[1] = gridDim.y;
@@ -299,6 +314,9 @@ cudaSetupArgument(const void *arg, size_t size, size_t offset)
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
 
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
   strce_to_send.op = CudaSetupArgument;
   strce_to_send.syscall_type.cuda_setup_argument.size = size;
   strce_to_send.syscall_type.cuda_setup_argument.offset = offset;
@@ -327,6 +345,9 @@ cudaLaunch(const void *func)
 
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
 
   strce_to_send.op = CudaLaunch;
 
