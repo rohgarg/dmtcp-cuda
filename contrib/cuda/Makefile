@@ -99,6 +99,7 @@ tidy:
 clean:
 	rm -f ${LIBOBJS} ${LIBNAME}.so test2 test/test2.1 cudaproxy cudaSysCallsLog
 	rm -f test/test1 test/test2 test/test3 test/test4 test/test5 test/test5 test/test6 test/test7
+	rm -f libcudaproxy.so
 
 distclean: clean
 	rm -f ${LIBNAME}.so *~ .*.swp dmtcp_restart_script*.sh ckpt_*.dmtcp
