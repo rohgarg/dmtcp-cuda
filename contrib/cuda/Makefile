@@ -19,8 +19,8 @@ endif
 DMTCP_INCLUDE=${DMTCP_ROOT}/include
 JALIB_INCLUDE=${DMTCP_ROOT}/jalib/
 
-CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -DDMTCP -ccbin /usr/bin/gcc-5 -Xcompiler -fPIC -c -g -O0
-CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -DDMTCP -ccbin /usr/bin/g++-5 -Xcompiler -fPIC -c -g -O0 -cudart shared
+CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/gcc-5 -Xcompiler -fPIC -c -g -O0
+CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/g++-5 -Xcompiler -fPIC -c -g -O0 -cudart shared
 
 # enable this for debugging the plugin
 # CFLAGS += -DCUDA_PLUGIN_DEBUG
@@ -34,25 +34,35 @@ vi:
 	vim cuda-plugin.cpp
 
 cudaproxy: cudaproxy.cu
-	nvcc -cudart shared -DSTANDALONE -I. -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $<
+	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -shared -o lib$@.so $< ../../src/libjalib.a -ldl
 
 test1: test/test1.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test2: test/test2.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test2.1: test/test2.1.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test3: test/test3.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
+
+test4: test/test4.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test7: test/test7.cu
-		cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test7.1: test/test7.1.cu
-		cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -o $@ $@.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 run2.1: ${LIBNAME}.so cudaproxy test2.1
 	../../bin/dmtcp_launch -j  --with-plugin ./libdmtcp_cuda.so test/test2.1
@@ -88,6 +98,7 @@ tidy:
 
 clean:
 	rm -f ${LIBOBJS} ${LIBNAME}.so test2 test/test2.1 cudaproxy cudaSysCallsLog
+	rm -f test/test1 test/test2 test/test3 test/test4 test/test5 test/test5 test/test6 test/test7
 
 distclean: clean
 	rm -f ${LIBNAME}.so *~ .*.swp dmtcp_restart_script*.sh ckpt_*.dmtcp

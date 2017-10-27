@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <string.h>
+#include <assert.h>
+#include <dlfcn.h>
 
 #ifdef USE_SHM
 # include <sys/ipc.h>
@@ -15,32 +17,54 @@
 
 // Definitions of common structs shared with the main process
 #include "cuda_plugin.h"
+#include "trampolines.h"
+
+#define SKTNAME "proxy"
+
+#ifndef EXTERNC
+# ifdef __cplusplus
+#  define EXTERNC extern "C"
+# else // ifdef __cplusplus
+#  define EXTERNC
+# endif // ifdef __cplusplus
+#endif // ifndef EXTERNC
 
 #ifdef USE_SHM
 int shmID;
 void *shmaddr;
 #endif
 
-int compute(int fd, cudaSyscallStructure *structure);
+static trampoline_info_t main_trampoline_info;
 
-// TODO: The proxy should just be a child process of the main process;
-//       we should get rid of this hardwired kernel
-__global__ void add(int a, int b, int *c)
+static int compute(int fd, cudaSyscallStructure *structure);
+static int start_proxy(void);
+
+// This is the trampoline destination for the user main; this does not return
+// to the user main function.
+int main_wrapper()
 {
-   *c = a+b;
+  start_proxy();
+  return 0;
 }
 
-__global__ void add_2_1(int a, int b, int *c)
+__attribute__((constructor))
+void proxy_init()
 {
-	*c = a + b;
+  void *handle = dlopen(NULL, RTLD_NOW);
+  void *addr = dlsym(handle, "main");
+  assert(addr != NULL);
+  dmtcp_setup_trampoline_by_addr(addr, (void*)&main_wrapper, &main_trampoline_info);
 }
 
-int main(int argc, char **argv)
+static int start_proxy(void)
 {
   // set up the server
   int skt_proxy, skt_accept;
   struct sockaddr_un sa_proxy;
-  char *sktname = argv[1];
+  const char *sktname = getenv("CUDA_PROXY_SOCKET");
+  if (!sktname) {
+    sktname = SKTNAME;
+  }
 
   (void) unlink(sktname);
   memset(&sa_proxy, 0, sizeof(sa_proxy));
@@ -136,15 +160,18 @@ int compute(int fd, cudaSyscallStructure *structure)
       break;
 
     case CudaMalloc:
-      return_val = cudaMalloc(&((structure->syscall_type).cuda_malloc.pointer),
+     {
+      return_val =  cudaMalloc(&((structure->syscall_type).cuda_malloc.pointer),
         (structure->syscall_type).cuda_malloc.size);
-      break;
+     }
+     break;
 
     case CudaMallocManaged:
-      return_val =
-          cudaMallocManaged(&((structure->syscall_type).cuda_malloc.pointer),
-                            (structure->syscall_type).cuda_malloc.size);
-      break;
+     {
+      return_val =  cudaMallocManaged(&((structure->syscall_type).cuda_malloc.pointer),
+                           (structure->syscall_type).cuda_malloc.size);
+     }
+     break;
 
     case CudaFree:
       return_val = cudaFree((structure->syscall_type).cuda_free.pointer);
@@ -256,7 +283,6 @@ int compute(int fd, cudaSyscallStructure *structure)
 
     case CudaConfigureCall:
     {
-      ;
       int *gridDim = (structure->syscall_type).cuda_configure_call.gridDim;
       dim3 gDim(gridDim[0], gridDim[1], gridDim[2]);      
 
@@ -265,9 +291,9 @@ int compute(int fd, cudaSyscallStructure *structure)
       size_t sharedMem = (structure->syscall_type).cuda_configure_call.sharedMem;
       cudaStream_t stream = (structure->syscall_type).cuda_configure_call.stream;
       return_val = cudaConfigureCall(gDim, bDim, sharedMem, stream);
-      
-      break;
     }
+
+    break;
 
     case CudaSetupArgument:
     {
@@ -288,11 +314,11 @@ int compute(int fd, cudaSyscallStructure *structure)
     }
 
     case CudaLaunch:
-    {
-      // return_val = cudaLaunch(add);
-      return_val = cudaLaunch(add_2_1);
-      break; 
-    }
+     {
+      const void *func = (structure->syscall_type).cuda_launch.func_addr;
+      return_val = cudaLaunch(func);
+     }
+     break;
 
     default:
       printf("bad op value: %d\n", (int) op);
