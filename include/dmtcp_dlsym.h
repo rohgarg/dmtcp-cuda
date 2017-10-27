@@ -45,7 +45,7 @@ EXTERNC void *dmtcp_dlsym_lib(const char *libname, const char *symbol);
 EXTERNC ptrdiff_t dmtcp_dlsym_lib_fnc_offset(const char *libname,
                                              const char *symbol);
 
-#ifndef STANDALONE
+#ifndef DMTCP_STANDALONE
 
 // This implementation mirrors dmtcp.h:NEXT_FNC() for DMTCP.
 // It uses dmtcp_dlsym to get default version, in case of symbol versioning
@@ -95,9 +95,9 @@ EXTERNC ptrdiff_t dmtcp_dlsym_lib_fnc_offset(const char *libname,
     }                                                                          \
     _real_##func;                                                              \
   })
-#endif // ifndef STANDALONE
+#endif // ifndef DMTCP_STANDALONE
 
-#ifdef STANDALONE
+#ifdef DMTCP_STANDALONE
 
 // For standalone testing.
 // Copy this .h file to tmp.c file for standalone testing, and:
@@ -126,4 +126,4 @@ main()
 
   return 0;
 }
-#endif // ifdef STANDALONE
+#endif // ifdef DMTCP_STANDALONE
