@@ -292,10 +292,11 @@ void*
 create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
 {
   int npages = size / page_size + 1;
-  void *addr = mmap(NULL, npages * page_size, PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
+  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
 
-  JASSERT(addr != MAP_FAILED)(JASSERT_ERRNO);
+  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
   monitor_pages(addr, npages * page_size, remoteInfo);
   return addr;
 }

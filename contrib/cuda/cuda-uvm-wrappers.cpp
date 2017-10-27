@@ -30,6 +30,7 @@ cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
   // TODO: Add field for flags
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  JASSERT(ret_val == cudaSuccess)(ret_val).Text("Failed to create UVM region");
 
   // change the pointer to point the global memory (device memory)
   *pointer = create_shadow_pages(size, &rcvd_strce);
