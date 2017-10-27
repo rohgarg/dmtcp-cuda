@@ -350,6 +350,7 @@ cudaLaunch(const void *func)
   memset(&rcvd_strce, 0, sizeof(rcvd_strce));
 
   strce_to_send.op = CudaLaunch;
+  strce_to_send.syscall_type.cuda_launch.func_addr = func;
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 

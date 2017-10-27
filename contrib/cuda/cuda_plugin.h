@@ -149,7 +149,7 @@ typedef struct
 
     struct
     {
-      int shmId;
+      const void *func_addr;
     } cuda_launch;
 
     struct

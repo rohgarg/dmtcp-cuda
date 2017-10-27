@@ -16,6 +16,10 @@
 # include <sys/shm.h>
 #endif
 
+// DMTCP utils
+#include "constants.h"
+#include "processinfo.h"
+
 #include "cuda_plugin.h"
 
 int initialized = False;
@@ -36,7 +40,8 @@ void proxy_initialize(void)
   strcpy(sa_proxy.sun_path, SKTNAME);
   sa_proxy.sun_family = AF_UNIX;
   char *const args[] = {const_cast<char*>("../../bin/dmtcp_nocheckpoint"),
-                        const_cast<char*>("./cudaproxy"),
+                        const_cast<char*>(dmtcp::ProcessInfo::instance()
+                               .procSelfExe().c_str()),
                         const_cast<char*>(SKTNAME),
                         NULL}; // FIXME: Compiler warning
 
@@ -45,6 +50,8 @@ void proxy_initialize(void)
       JASSERT(false)(JASSERT_ERRNO).Text("Failed to fork cudaproxy");
 
     case 0:
+      setenv(ENV_VAR_ORIG_LD_PRELOAD, "./libcudaproxy.so", 1);
+      setenv("CUDA_PROXY_SOCKET", "./proxy", 1);
       JASSERT(execvp((const char*)args[0], args) != -1)(JASSERT_ERRNO)
              .Text("Failed to exec cudaproxy");
   }
@@ -121,7 +128,7 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
   // receive the result
   JASSERT(read(fd, ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
 
-  JASSERT((*ret_val) == cudaSuccess).Text("CUDA syscall failed");
+  JASSERT((*ret_val) == cudaSuccess)(*ret_val).Text("CUDA syscall failed");
 
   // get the structure back
   memset(rcvd_strce, 0, sizeof(cudaSyscallStructure));
