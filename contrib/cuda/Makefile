@@ -56,6 +56,14 @@ test4: test/test4.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
+test5: test/test5.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
+
+test6: test/test6.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
+
 test7: test/test7.cu
 	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart

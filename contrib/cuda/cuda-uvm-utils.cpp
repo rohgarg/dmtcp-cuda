@@ -25,6 +25,8 @@
 int ufd_initialized = False;
 int page_size = -1;
 
+bool haveDirtyPages = false;
+
 // Private global vars
 
 static int uffd = -1;
@@ -32,9 +34,12 @@ static int uffd = -1;
 struct ShadowRegion {
   void *addr;
   size_t len;
+  bool dirty;
 };
 
 // Private functions
+
+static void reregister_page(void *addr, size_t len);
 
 dmtcp::map<void*, void*>&
 shadowPageMap()
@@ -59,6 +64,28 @@ allShadowRegions()
 }
 
 static bool
+sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
+{
+  cudaSyscallStructure strce_to_send;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+
+  strce_to_send.op = CudaMallocManagedMemcpy;
+  strce_to_send.syscall_type.cuda_memcpy.destination = remotePtr;
+  strce_to_send.syscall_type.cuda_memcpy.source = localPtr;
+  strce_to_send.syscall_type.cuda_memcpy.size = size;
+  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyHostToDevice;
+
+  // send the structure
+  JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
+         (JASSERT_ERRNO);
+
+  // send the payload: part of the GPU computation actually
+  // XXX: We send a page at a time
+  JASSERT(write(skt_master, localPtr, size) != -1)(JASSERT_ERRNO);
+}
+
+static bool
 receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 {
   cudaSyscallStructure strce_to_send;
@@ -77,7 +104,21 @@ receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 
   // get the payload: part of the GPU computation actually
   // XXX: We read a page at a time
-  JASSERT(read(skt_master, localPtr, size) != -1)(JASSERT_ERRNO);
+  JASSERT(dmtcp::Util::readAll(skt_master, localPtr, size) == size)
+         (JASSERT_ERRNO);
+}
+
+static void
+markDirtyRegion(void *page)
+{
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    if (it->addr == page) {
+      it->dirty = true;
+      haveDirtyPages = true;
+      return;
+    }
+  }
 }
 
 static void*
@@ -130,7 +171,7 @@ fault_handler_thread(void *arg)
 
     JTRACE("    UFFD_EVENT_PAGEFAULT event: ")
           (msg.arg.pagefault.flags)
-          (msg.arg.pagefault.address);
+          ((void*)msg.arg.pagefault.address);
 
     /* Copy the page pointed to by 'page' into the faulting
        region. Vary the contents that are copied in, so that it
@@ -142,7 +183,12 @@ fault_handler_thread(void *arg)
       JASSERT(false)(faultingPage)(msg.arg.pagefault.address)
              .Text("No UVM page found for faulting address");
     } else {
-      receiveDataFromProxy(shadowPageMap()[faultingPage], page, page_size);
+      if (msg.arg.pagefault.flags & UFFD_PAGEFAULT_FLAG_WRITE) {
+        // We mark the region as dirty for flushing at a later sync point
+        markDirtyRegion(faultingPage);
+      } else {
+        receiveDataFromProxy(shadowPageMap()[faultingPage], page, page_size);
+      }
     }
     fault_cnt++;
 
@@ -177,14 +223,45 @@ monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
 
   if (remoteInfo) {
     // Save the location and size of the shadow region
-    ShadowRegion r =  {.addr = addr, .len = size};
+    ShadowRegion r =  {.addr = addr, .len = size, .dirty = false};
     allShadowRegions().push_back(r);
     // Save the actual UVM region on the proxy
     shadowPageMap()[addr] = remoteInfo->syscall_type.cuda_malloc.pointer;
   }
 }
 
+static void
+reregister_page(void *addr, size_t len)
+{
+  JASSERT(munmap(addr, len) == 0)(JASSERT_ERRNO);
+  void *newaddr = mmap(addr, len, PROT_READ | PROT_WRITE,
+                    MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+  JASSERT(newaddr != MAP_FAILED)(JASSERT_ERRNO);
+  monitor_pages(addr, len);
+}
+
 // Public functions
+
+void
+flushDirtyPages()
+{
+  if (!haveDirtyPages) return;
+
+  JTRACE("Flushing all dirty pages");
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    if (it->dirty) {
+      JTRACE("Send data to proxy")((void*)it->addr)(it->len);
+      sendDataToProxy(it->addr, it->addr, it->len);
+      // NOTE: We re-register the dirty page because UFFDIO_COPY
+      //       unregisters the page.
+      reregister_page(it->addr, it->len);
+      it->dirty = false;
+    }
+  }
+  haveDirtyPages = false;
+}
 
 void
 unregister_all_pages()
@@ -214,12 +291,7 @@ register_all_pages()
      *
      * FIXME: We need to copy/restore the data on these pages
      */
-    JASSERT(munmap(it->addr, it->len) == 0)(JASSERT_ERRNO);
-    void *addr = mmap(it->addr, it->len, PROT_READ | PROT_WRITE,
-                      MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    JASSERT(addr != MAP_FAILED)(JASSERT_ERRNO);
-    monitor_pages(it->addr, it->len);
+    reregister_page(it->addr, it->len);
   }
 }
 

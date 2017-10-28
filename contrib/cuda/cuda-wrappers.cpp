@@ -343,6 +343,11 @@ cudaLaunch(const void *func)
   if (!initialized)
     proxy_initialize();
 
+  // TODO: Ideally, we should flush only when the function uses the
+  // data from the managed regions
+  if (haveDirtyPages)
+    flushDirtyPages();
+
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
 

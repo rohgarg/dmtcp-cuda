@@ -51,6 +51,8 @@ extern void *shmaddr;
 extern int logFd;
 extern int page_size;
 
+extern bool haveDirtyPages;
+
 // master socket
 extern int skt_master;
 
@@ -181,6 +183,7 @@ void reset_uffd(void);
 void* create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo = NULL);
 void unregister_all_pages();
 void register_all_pages();
+void flushDirtyPages();
 
 dmtcp::map<void*, void*>& shadowPageMap();
 
