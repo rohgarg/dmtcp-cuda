@@ -190,10 +190,22 @@ int compute(int fd, cudaSyscallStructure *structure)
 
           break;
 
+        case cudaMemcpyHostToDevice:
+          // read the data from the master directly into the UVM region
+          if (read(fd,
+                   (structure->syscall_type).cuda_memcpy.destination,
+                   (structure->syscall_type).cuda_memcpy.size) == -1) {
+            perror("read()");
+            exit(EXIT_FAILURE);
+          }
+
+          break;
+
         default:
           printf("bad direction value: %d\n", direction);
           exit(EXIT_FAILURE);
       }
+      break;
 
     //
     case CudaMemcpy:

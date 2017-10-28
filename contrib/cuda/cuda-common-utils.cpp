@@ -128,7 +128,8 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
   // receive the result
   JASSERT(read(fd, ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
 
-  JASSERT((*ret_val) == cudaSuccess)(*ret_val).Text("CUDA syscall failed");
+  JASSERT((*ret_val) == cudaSuccess)
+         (cudaGetErrorString(*ret_val)).Text("CUDA syscall failed");
 
   // get the structure back
   memset(rcvd_strce, 0, sizeof(cudaSyscallStructure));
