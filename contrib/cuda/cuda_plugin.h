@@ -62,11 +62,21 @@ extern struct sockaddr_un sa_proxy;
 
 enum cuda_syscalls
 {
-  CudaMalloc, CudaFree, CudaMallocArray, CudaFreeArray,
-  CudaMallocManaged, CudaMallocManagedMemcpy,
-  CudaMemcpy, CudaHostAlloc, CudaConfigureCall, CudaSetupArgument,
+  CudaMalloc,
+  CudaFree,
+  CudaMallocArray,
+  CudaFreeArray,
+  CudaMallocManaged,
+  CudaMallocManagedMemcpy,
+  CudaMemcpy,
+  CudaHostAlloc,
+  CudaConfigureCall,
+  CudaSetupArgument,
   CudaLaunch,
   CudaDeviceSync,
+  CudaThreadSync,
+  CudaGetLastError,
+  CudaGetErrorString
 };
 
 // the structure for all our cuda system calls
@@ -154,10 +164,16 @@ typedef struct
       const void *func_addr;
     } cuda_launch;
 
+//    struct
+//    {
+//      const void *func;
+//    } cuda_launch_record;
     struct
     {
-      const void *func;
-    } cuda_launch_record;
+      cudaError_t errorCode;
+      char *error_string; // to be used by the proxy.
+      size_t size;
+    } cuda_get_error_string;
   }syscall_type;
   const void *payload;
   size_t payload_size;

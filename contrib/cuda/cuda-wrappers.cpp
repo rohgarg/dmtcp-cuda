@@ -34,6 +34,7 @@ cudaMalloc(void **pointer, size_t size)
   // record this system call to the log file
   memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
   strce_to_send.op = CudaMalloc;
+  // FIXME: should we save record_pointer or pointer?
   strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
   strce_to_send.syscall_type.cuda_malloc.size = size;
 
@@ -387,4 +388,71 @@ cudaDeviceSynchronize(void)
   log_append(strce_to_send);
 
   return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaThreadSynchronize(void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  cudaError_t ret_val;
+
+  strce_to_send.op = CudaThreadSync;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  strce_to_send.op = CudaThreadSync;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaGetLastError(void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcv_strce;
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  cudaError_t ret_val;
+
+  strce_to_send.op = CudaGetLastError;
+  send_recv(skt_master, &strce_to_send, &rcv_strce, &ret_val);
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  strce_to_send.op = CudaGetLastError;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC const char*
+cudaGetErrorString(cudaError_t errorCode)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcv_strce;
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  cudaError_t ret_val;
+  char *ret_string;
+
+  strce_to_send.op = CudaGetErrorString;
+  strce_to_send.syscall_type.cuda_get_error_string.errorCode = errorCode;
+  send_recv(skt_master, &strce_to_send, &rcv_strce, &ret_val);
+
+  ret_string = rcv_strce.syscall_type.cuda_get_error_string.error_string;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  strce_to_send.op = CudaGetLastError;
+
+  log_append(strce_to_send);
+
+  return (const char *) ret_string;
 }
