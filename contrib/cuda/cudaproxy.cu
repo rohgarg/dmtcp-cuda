@@ -139,6 +139,20 @@ static int start_proxy(void)
       perror("write()");
       exit(EXIT_FAILURE);
     }
+    // "cudaGetErrorString" is a special case, its return type
+    // is "const char *"
+    if (structure.op == CudaGetErrorString)
+    {
+      // send the error string to master.
+      char *error_string = structure.syscall_type.cuda_get_error_string.error_string;
+      size_t size = structure.syscall_type.cuda_get_error_string.size;
+      if (write(skt_accept, error_string, size) == -1)
+      {
+        perror("write()");
+        exit(EXIT_FAILURE);
+      }
+    }
+
    }
 }
 
@@ -157,6 +171,23 @@ int compute(int fd, cudaSyscallStructure *structure)
     //
     case CudaDeviceSync:
       return_val = cudaDeviceSynchronize();
+      break;
+
+    case CudaThreadSync:
+      return_val = cudaThreadSynchronize();
+      break;
+
+    case CudaGetLastError:
+      return_val = cudaGetLastError();
+      break;
+
+    case CudaGetErrorString:
+    {
+      cudaError_t errorCode = (cudaError_t)(structure->syscall_type).cuda_get_error_string.errorCode;
+      char *error_string = (char *)cudaGetErrorString(errorCode);
+      (structure->syscall_type).cuda_get_error_string.error_string = error_string;
+      return_val = cudaSuccess;
+    }
       break;
 
     case CudaMalloc:
