@@ -456,3 +456,40 @@ cudaGetErrorString(cudaError_t errorCode)
 
   return (const char *) ret_string;
 }
+
+EXTERNC cudaError_t
+cudaMallocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+
+  strce_to_send.op = CudaMallocPitch;
+  strce_to_send.syscall_type.cuda_malloc_pitch.devPtr = *devPtr;
+  strce_to_send.syscall_type.cuda_malloc_pitch.pitch = pitch;
+  strce_to_send.syscall_type.cuda_malloc_pitch.width = width;
+  strce_to_send.syscall_type.cuda_malloc_pitch.height = height;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  void *record_pointer = *devPtr;
+
+  // change the pointer to point the global memory (device memory)
+  *devPtr = rcvd_strce.syscall_type.cuda_malloc_pitch.devPtr;
+
+  // record this system call to the log file
+  // memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaMallocPitch;
+  // FIXME: should we save record_pointer or devPtr?
+  strce_to_send.syscall_type.cuda_malloc_pitch.devPtr = *devPtr;
+  // strce_to_send.syscall_type.cuda_malloc_pitch.pitch = pitch;
+  // strce_to_send.syscall_type.cuda_malloc_pitch.width = width;
+  // strce_to_send.syscall_type.cuda_malloc_pitch.height = height;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
