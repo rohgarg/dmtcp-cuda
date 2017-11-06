@@ -76,7 +76,8 @@ enum cuda_syscalls
   CudaDeviceSync,
   CudaThreadSync,
   CudaGetLastError,
-  CudaGetErrorString
+  CudaGetErrorString,
+  CudaMallocPitch
 };
 
 // the structure for all our cuda system calls
@@ -174,6 +175,17 @@ typedef struct
       char *error_string; // to be used by the proxy.
       size_t size;
     } cuda_get_error_string;
+
+    struct
+    {
+      // the structure takes a deferenced pointer
+      // Since it's the proxy that calls cudaMallocPitch()
+      // &devPtr, (void **), will then be passed to cudaMallocPitch.
+      void* devPtr;
+      size_t* pitch;
+      size_t width;
+      size_t height;
+    } cuda_malloc_pitch;
   }syscall_type;
   const void *payload;
   size_t payload_size;
