@@ -55,6 +55,7 @@ static void
 pre_ckpt()
 {
   unregister_all_pages();
+  copy_data_to_host();
 }
 
 static void
@@ -78,6 +79,7 @@ restart()
     perror("open()");
     exit(EXIT_FAILURE);
   }
+  disable_cuda_call_logging();
   cudaSyscallStructure rec;
   memset(&rec, 0, sizeof(rec));
   // Replay calls from the log
@@ -93,6 +95,8 @@ restart()
     }
     ret = log_read(&rec);
   }
+  copy_data_to_device();
+  enable_cuda_call_logging();
 }
 
 static DmtcpBarrier cudaPluginBarriers[] = {

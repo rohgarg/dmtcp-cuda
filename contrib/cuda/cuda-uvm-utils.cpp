@@ -329,7 +329,11 @@ userfaultfd_initialize(void)
 void
 reset_uffd(void)
 {
-  JASSERT(ufd_initialized && page_size > 0);
+  if (ufd_initialized) {
+    JASSERT(page_size > 0);
+  } else {
+    return;
+  }
 
   struct uffdio_api uffdio_api;
   int old_uffd = uffd;

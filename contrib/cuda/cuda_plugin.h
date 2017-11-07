@@ -58,6 +58,8 @@ extern int skt_master;
 
 // proxy address
 extern struct sockaddr_un sa_proxy;
+
+extern bool enableCudaCallLogging;
 #endif // ifndef STANDALONE
 
 enum cuda_syscalls
@@ -201,10 +203,17 @@ getAlignedAddress(uintptr_t ptr, size_t alignment)
 }
 
 void proxy_initialize(void);
+void copy_data_to_host(void);
+void copy_data_to_device(void);
+
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
 void log_append(cudaSyscallStructure record);
 bool log_read(cudaSyscallStructure *record);
+
+void disable_cuda_call_logging();
+void enable_cuda_call_logging();
+bool should_log_cuda_calls();
 
 void userfaultfd_initialize(void);
 void reset_uffd(void);
