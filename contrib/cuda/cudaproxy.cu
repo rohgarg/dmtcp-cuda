@@ -203,7 +203,7 @@ int compute(int fd, cudaSyscallStructure *structure)
       size_t *pitch = (structure->syscall_type).cuda_malloc_pitch.pitch;
       size_t width = (structure->syscall_type).cuda_malloc_pitch.width;
       size_t height = (structure->syscall_type).cuda_malloc_pitch.height;
-      return_val =  cudaMalloc(devPtr, pitch, width, height);
+      return_val =  cudaMallocPitch(devPtr, pitch, width, height);
      }
      break;
 
