@@ -35,13 +35,15 @@ cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
   // change the pointer to point the global memory (device memory)
   *pointer = create_shadow_pages(size, &rcvd_strce);
 
-  // record this system call to the log file
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  strce_to_send.op = CudaMallocManaged;
-  strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
-  strce_to_send.syscall_type.cuda_malloc.size = size;
+  if (should_log_cuda_calls()) {
+    // record this system call to the log file
+    memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+    strce_to_send.op = CudaMallocManaged;
+    strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
+    strce_to_send.syscall_type.cuda_malloc.size = size;
 
-  log_append(strce_to_send);
+    log_append(strce_to_send);
+  }
 
   return ret_val;
 }

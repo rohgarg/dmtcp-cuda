@@ -5,9 +5,50 @@
 #include <cuda_runtime_api.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 
 #include "config.h"
 #include "cuda_plugin.h"
+
+
+struct MallocRegion {
+  void *addr;
+  void *host_addr;
+  size_t len;
+};
+
+static dmtcp::vector<MallocRegion>&
+allMallocRegions()
+{
+  static dmtcp::vector<MallocRegion> *instance = NULL;
+  if (instance == NULL) {
+    void *buffer = JALLOC_MALLOC(1024 * 1024);
+    instance = new (buffer)dmtcp::vector<MallocRegion>();
+  }
+  return *instance;
+}
+
+void
+copy_data_to_host()
+{
+  dmtcp::vector<MallocRegion>::iterator it;
+  for (it = allMallocRegions().begin(); it != allMallocRegions().end(); it++) {
+    void *page = mmap(NULL, it->len, PROT_READ | PROT_WRITE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    JASSERT(page != MAP_FAILED)(JASSERT_ERRNO);
+    it->host_addr = page;
+    cudaMemcpy(page, it->addr, it->len, cudaMemcpyDeviceToHost);
+  }
+}
+
+void
+copy_data_to_device()
+{
+  dmtcp::vector<MallocRegion>::iterator it;
+  for (it = allMallocRegions().begin(); it != allMallocRegions().end(); it++) {
+    cudaMemcpy(it->addr, it->host_addr, it->len, cudaMemcpyHostToDevice);
+  }
+}
 
 // 1.
 EXTERNC cudaError_t
@@ -26,19 +67,24 @@ cudaMalloc(void **pointer, size_t size)
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
-  void *record_pointer = *pointer;
+  if (should_log_cuda_calls()) {
+    void *record_pointer = *pointer;
 
-  // change the pointer to point the global memory (device memory)
-  *pointer = rcvd_strce.syscall_type.cuda_malloc.pointer;
+    // change the pointer to point the global memory (device memory)
+    *pointer = rcvd_strce.syscall_type.cuda_malloc.pointer;
 
-  // record this system call to the log file
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  strce_to_send.op = CudaMalloc;
-  // FIXME: should we save record_pointer or pointer?
-  strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
-  strce_to_send.syscall_type.cuda_malloc.size = size;
+    // record this system call to the log file
+    memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+    strce_to_send.op = CudaMalloc;
+    // FIXME: should we save record_pointer or pointer?
+    strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
+    strce_to_send.syscall_type.cuda_malloc.size = size;
 
-  log_append(strce_to_send);
+    log_append(strce_to_send);
+
+    MallocRegion r =  {.addr = *pointer, .host_addr = NULL, .len = size};
+    allMallocRegions().push_back(r);
+  }
 
   return ret_val;
 }

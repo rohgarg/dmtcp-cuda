@@ -33,6 +33,9 @@ int skt_master;
 // proxy address
 struct sockaddr_un sa_proxy;
 
+// NOTE: Do not access this directly; use the accessor functions
+bool enableCudaCallLogging = true;
+
 // initialize the proxy
 void proxy_initialize(void)
 {
@@ -147,4 +150,25 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
     (rcvd_strce->syscall_type).cuda_get_error_string.error_string \
      = error_string;
   }
+}
+
+void
+disable_cuda_call_logging()
+{
+  // TODO: Add locks for thread safety
+  enableCudaCallLogging = false;
+}
+
+void
+enable_cuda_call_logging()
+{
+  // TODO: Add locks for thread safety
+  enableCudaCallLogging = true;
+}
+
+bool
+should_log_cuda_calls()
+{
+  // TODO: Add locks for thread safety
+  return enableCudaCallLogging;
 }
