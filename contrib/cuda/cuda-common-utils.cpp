@@ -133,7 +133,7 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
 
   if (strce_to_send->op != CudaGetLastError){
     JASSERT((*(cudaError_t*)ret_val) == cudaSuccess)
-           (cudaGetErrorString(*(cudaError_t*)ret_val)).Text("CUDA syscall failed");
+       (cudaGetErrorString(*(cudaError_t*)ret_val)).Text("CUDA syscall failed");
   }
 
   // get the structure back
@@ -155,7 +155,6 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
     }
     break;
   }
-
 }
 
 void
