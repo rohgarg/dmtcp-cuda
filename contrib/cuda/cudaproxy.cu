@@ -20,6 +20,7 @@
 #include "trampolines.h"
 
 #define SKTNAME "proxy"
+#define specialCudaReturnValue  60000
 
 #ifndef EXTERNC
 # ifdef __cplusplus
@@ -186,26 +187,99 @@ int compute(int fd, cudaSyscallStructure *structure)
       cudaError_t errorCode = (cudaError_t)(structure->syscall_type).cuda_get_error_string.errorCode;
       char *error_string = (char *)cudaGetErrorString(errorCode);
       (structure->syscall_type).cuda_get_error_string.error_string = error_string;
+      (structure->syscall_type).cuda_get_error_string.size = strlen(error_string);
       return_val = cudaSuccess;
     }
       break;
 
     case CudaMalloc:
      {
+      printf("proxy: cudaMalloc()\n");
       return_val =  cudaMalloc(&((structure->syscall_type).cuda_malloc.pointer),
         (structure->syscall_type).cuda_malloc.size);
+      printf("%d\n", return_val);
      }
      break;
+
 
     case CudaMallocPitch:
      {
       void **devPtr = &((structure->syscall_type).cuda_malloc_pitch.devPtr);
-      size_t *pitch = (structure->syscall_type).cuda_malloc_pitch.pitch;
+      size_t *pitch = &((structure->syscall_type).cuda_malloc_pitch.pitch);
       size_t width = (structure->syscall_type).cuda_malloc_pitch.width;
       size_t height = (structure->syscall_type).cuda_malloc_pitch.height;
       return_val =  cudaMallocPitch(devPtr, pitch, width, height);
      }
      break;
+
+    case CudaDeviceReset:
+    {
+      return_val = cudaDeviceReset();
+    }
+    break;
+
+    case CudaMemcpyToSymbol:
+    {
+      const void * symbol = (structure->syscall_type).cuda_memcpy_to_symbol.symbol;
+      const void * src = (structure->syscall_type).cuda_memcpy_to_symbol.src;
+      void *new_src;
+      size_t count = (structure->syscall_type).cuda_memcpy_to_symbol.count;
+      size_t offset = (structure->syscall_type).cuda_memcpy_to_symbol.offset;
+      enum cudaMemcpyKind kind = (structure->syscall_type).cuda_memcpy_to_symbol.kind;
+
+      if (kind == cudaMemcpyHostToDevice){
+        // read the payload.
+        new_src = malloc(count);
+        if (new_src == NULL){
+          perror("malloc()");
+          exit(EXIT_FAILURE);
+        }
+        if (read(fd, new_src, count) == -1){
+          perror("read()");
+          exit(EXIT_FAILURE);
+        }
+        return_val = cudaMemcpyToSymbol(symbol, new_src, count, offset, kind);
+      }
+      else if (kind == cudaMemcpyDeviceToDevice){
+        return_val = cudaMemcpyToSymbol(symbol, src, count, offset, kind);
+      }
+      else{
+        perror("bad direction value");
+        exit(EXIT_FAILURE);
+      }
+    }
+    break;
+
+
+    case CudaCreateChannelDesc:
+    {
+      int x = (structure->syscall_type).cuda_create_channel_desc.x;
+      int y = (structure->syscall_type).cuda_create_channel_desc.y;
+      int z = (structure->syscall_type).cuda_create_channel_desc.z;
+      int w = (structure->syscall_type).cuda_create_channel_desc.w;
+      enum cudaChannelFormatKind f = (structure->syscall_type).cuda_create_channel_desc.f;
+      (structure->syscall_type).cuda_create_channel_desc.ret_val = cudaCreateChannelDesc(x, y, z, w, f);
+
+      return_val = cudaSuccess;
+    }
+    break;
+
+
+    case CudaBindTexture2D:
+    {
+      // offset is an "out" parameter.
+      size_t offset;
+      // size_t * offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
+      const textureReference * texref = (structure->syscall_type).cuda_bind_texture2_d.texref;
+      const void * devPtr = (structure->syscall_type).cuda_bind_texture2_d.devPtr;
+      const cudaChannelFormatDesc * desc = (structure->syscall_type).cuda_bind_texture2_d.desc;
+      size_t width = (structure->syscall_type).cuda_bind_texture2_d.width;
+      size_t height = (structure->syscall_type).cuda_bind_texture2_d.height;
+      size_t pitch = (structure->syscall_type).cuda_bind_texture2_d.pitch;
+      return_val = cudaBindTexture2D(&offset, texref, devPtr, desc, width, height, pitch);
+      (structure->syscall_type).cuda_bind_texture2_d.offset = offset;
+    }
+    break;
 
     case CudaMallocManaged:
      {
@@ -313,6 +387,79 @@ int compute(int fd, cudaSyscallStructure *structure)
       }
       break;
 
+    case CudaMemcpy2D:
+    {
+      void *dst = (structure->syscall_type).cuda_memcpy2_d.dst;
+      void *new_dst;
+      size_t dpitch = (structure->syscall_type).cuda_memcpy2_d.dpitch;
+      const void *src =  (structure->syscall_type).cuda_memcpy2_d.src;
+      void *new_src;
+      size_t spitch =  (structure->syscall_type).cuda_memcpy2_d.spitch;
+      size_t width =  (structure->syscall_type).cuda_memcpy2_d.width;
+      size_t height =  (structure->syscall_type).cuda_memcpy2_d.height;
+      enum cudaMemcpyKind kind =  (structure->syscall_type).cuda_memcpy2_d.kind;
+
+      switch(kind)
+      {
+        case cudaMemcpyHostToDevice:
+          // receive payload
+          // we need a new memory space for source
+          new_src = malloc(spitch * height);
+          if (new_src == NULL)
+          {
+            printf("malloc() failed\n");
+            exit(EXIT_FAILURE);
+          }
+
+          if (read(fd, new_src, spitch * height) == -1)
+          {
+            perror("read()");
+            exit(EXIT_FAILURE);
+          }
+
+          // GPU computation
+          return_val = cudaMemcpy2D(dst, dpitch, new_src, spitch, width, height, kind);
+
+          free(new_src);
+          break;
+
+
+        case cudaMemcpyDeviceToHost:
+          // we need a new pointer for destination
+          new_dst = malloc(dpitch * height);
+          if (new_destination == NULL)
+          {
+            printf("malloc() failed\n");
+            exit(EXIT_FAILURE);
+          }
+
+          // GPU computation
+          return_val = cudaMemcpy2D(new_dst, dpitch, src, spitch, width, height, kind);
+
+          // send data to the master
+          if (write(fd, new_dst, (dpitch * height)) == -1)
+          {
+            perror("write()");
+            exit(EXIT_FAILURE);
+          }
+
+          free(new_dst);
+          break;
+
+        case cudaMemcpyDeviceToDevice:
+          // GPU computation
+          return_val = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
+          break;
+
+        default:
+          printf("bad direction value: %d\n", direction);
+          exit(EXIT_FAILURE);
+
+      }
+    }
+    break;
+
+
     case CudaMallocArray:
       return_val = cudaMallocArray(&((structure->syscall_type).cuda_malloc_array.array),
                        &((structure->syscall_type).cuda_malloc_array.desc),
@@ -378,5 +525,6 @@ int compute(int fd, cudaSyscallStructure *structure)
       exit(EXIT_FAILURE);
 
   }
+
   return return_val;
 }
