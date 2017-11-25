@@ -65,11 +65,12 @@ extern bool enableCudaCallLogging;
 enum cuda_syscalls
 {
   CudaMalloc,
+  CudaMallocPitch,
+  CudaMallocManaged,
+  CudaMallocManagedMemcpy,
   CudaFree,
   CudaMallocArray,
   CudaFreeArray,
-  CudaMallocManaged,
-  CudaMallocManagedMemcpy,
   CudaMemcpy,
   CudaHostAlloc,
   CudaConfigureCall,
@@ -79,8 +80,13 @@ enum cuda_syscalls
   CudaThreadSync,
   CudaGetLastError,
   CudaGetErrorString,
-  CudaMallocPitch
+  CudaMemcpy2D,
+  CudaDeviceReset,
+  CudaMemcpyToSymbol,
+  CudaCreateChannelDesc,
+  CudaBindTexture2D
 };
+
 
 // the structure for all our cuda system calls
 // so far it's for the following functions
@@ -174,7 +180,8 @@ typedef struct
     struct
     {
       cudaError_t errorCode;
-      char *error_string; // to be used by the proxy.
+      // return value non-trivial (i.e. other than cudaError_t)
+      char *error_string;
       size_t size;
     } cuda_get_error_string;
 
@@ -182,12 +189,58 @@ typedef struct
     {
       // the structure takes a deferenced pointer
       // Since it's the proxy that calls cudaMallocPitch()
-      // &devPtr, (void **), will then be passed to cudaMallocPitch.
+      // &devPtr, (void *), will then be passed to cudaMallocPitch.
       void* devPtr;
-      size_t* pitch;
+      // original argument is "*pitch" but this makes information
+      // exchange between wrapper and proxy easier.
+      size_t pitch;
       size_t width;
       size_t height;
     } cuda_malloc_pitch;
+
+    struct
+     {
+       void * dst;
+       size_t dpitch;
+       const void * src;
+       size_t spitch;
+       size_t width;
+       size_t height;
+       enum cudaMemcpyKind kind;
+     } cuda_memcpy2_d;
+
+     struct
+     {
+       const void * symbol;
+       const void * src;
+       size_t count;
+       size_t offset;
+       enum cudaMemcpyKind kind;
+     } cuda_memcpy_to_symbol;
+
+     struct
+     {
+       int x;
+       int y;
+       int z;
+       int w;
+       enum cudaChannelFormatKind f;
+       // return value non-trivial (i.e. other than cudaError_t)
+       cudaChannelFormatDesc ret_val;
+     } cuda_create_channel_desc;
+
+     struct
+     {
+       // (*offset) is an "out" parameter. The value changes in the proxy.
+       // we chose "offset" instead of "*offset", it's easier to code this way.
+       size_t offset;
+       const struct textureReference * texref;
+       const void  *devPtr;
+       const cudaChannelFormatDesc * desc;
+       size_t width;
+       size_t height;
+       size_t pitch;
+     } cuda_bind_texture2_d;
   }syscall_type;
   const void *payload;
   size_t payload_size;

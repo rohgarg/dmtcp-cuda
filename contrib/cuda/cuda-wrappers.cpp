@@ -65,6 +65,9 @@ cudaMalloc(void **pointer, size_t size)
   strce_to_send.syscall_type.cuda_malloc.pointer = *pointer;
   strce_to_send.syscall_type.cuda_malloc.size = size;
 
+  /* for testing */
+  printf("wrappers(cudaMalloc): before send_recv\n");
+  /* end: for testing */
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   if (should_log_cuda_calls()) {
@@ -85,6 +88,9 @@ cudaMalloc(void **pointer, size_t size)
     MallocRegion r =  {.addr = *pointer, .host_addr = NULL, .len = size};
     allMallocRegions().push_back(r);
   }
+  /* for testing */
+  printf("wrappers(cudaMalloc): before return\n");
+  /* end: for testing */
 
   return ret_val;
 }
@@ -112,6 +118,7 @@ cudaFree(void *pointer)
   strce_to_send.op = CudaFree;
   strce_to_send.syscall_type.cuda_free.pointer = pointer;
 
+  JNOTE("MY PLUG ====== cudaFree");
   log_append(strce_to_send);
 
   return ret_val;
@@ -195,6 +202,97 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
   return ret_val;
 }
 
+
+EXTERNC cudaError_t
+cudaMemcpy2D(void *dst, size_t dpitch, const void *src, size_t spitch,
+             size_t width, size_t height, enum cudaMemcpyKind direction)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val = cudaSuccess;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaMemcpy2D;
+  strce_to_send.syscall_type.cuda_memcpy2_d.dst = dst;
+  strce_to_send.syscall_type.cuda_memcpy2_d.dpitch = dpitch;
+  strce_to_send.syscall_type.cuda_memcpy2_d.src = src;
+  strce_to_send.syscall_type.cuda_memcpy2_d.spitch = spitch;
+  strce_to_send.syscall_type.cuda_memcpy2_d.width = width;
+  strce_to_send.syscall_type.cuda_memcpy2_d.height = height;
+  strce_to_send.syscall_type.cuda_memcpy2_d.kind = direction;
+
+  switch(direction)
+  {
+    JTRACE("cudaMemcpy(): lib");
+
+    case cudaMemcpyHostToHost:
+    {
+      // height: number of rows
+      int i;
+      for (i=0; i< height; ++i){
+        memcpy((void*)((char*)dst+(i*dpitch)), \
+                                      (void*)((char*)src+ (i*spitch)), width);
+      }
+      return ret_val;
+    }
+
+    case cudaMemcpyHostToDevice:
+    {
+      strce_to_send.payload = src;
+      // the size includes padding.
+      strce_to_send.payload_size = (spitch * height);
+      send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+    }
+    break;
+
+    case cudaMemcpyDeviceToHost:
+      // send the structure
+      JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
+             (JASSERT_ERRNO);
+
+      // get the payload: part of the GPU computation actually
+      // size includes padding.
+      JASSERT(read(skt_master, dst, (dpitch * height)) != -1)(JASSERT_ERRNO);
+
+      // receive the result
+      memset(&ret_val, 0, sizeof(ret_val));
+
+      JASSERT(read(skt_master, &ret_val, sizeof(ret_val)) != -1)(JASSERT_ERRNO);
+
+      JASSERT(ret_val == cudaSuccess)(ret_val).Text("cudaMemcpy failed");
+
+      // get the structure back
+      memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+      JASSERT(read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) != -1)
+             (JASSERT_ERRNO);
+      break;
+
+    case cudaMemcpyDeviceToDevice:
+      send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+      break;
+
+    default:
+      JASSERT(false)(direction).Text("Unknown direction for memcpy");
+  }
+
+//  memset(&strce_to_send, 0, sizeof(strce_to_send));
+//  strce_to_send.op = CudaMemcpy;
+//  strce_to_send.syscall_type.cuda_memcpy.destination = pointer1;
+//  strce_to_send.syscall_type.cuda_memcpy.source = pointer2;
+//  strce_to_send.syscall_type.cuda_memcpy.size = size;
+//  strce_to_send.syscall_type.cuda_memcpy.direction = direction;
+
+  log_append(strce_to_send);
+  return ret_val;
+}
+
+
+
 // 4.
 EXTERNC cudaError_t
 cudaMallocArray(struct cudaArray **array,
@@ -265,55 +363,6 @@ cudaFreeArray(struct cudaArray *array)
   return ret_val;
 }
 
-
-#if 0
-// 6.
-void cudaHostAlloc(void **pHost, size_t size, unsigned int flags)
-{
-  if (!initialized)
-    proxy_initialize();
-
-  cudaSyscallStructure strce_to_send, rcvd_strce;
-  int ret_val;
-
-  strce_to_send.op = CudaHostAlloc;
-  strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
-  strce_to_send.syscall_type.cuda_host_alloc.size = size;
-  strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
-
-  //
-  send_recv(skt_master, &strce_to_send, &rcv_strce, &ret_val);
-
-  // receive shmid
-  int shmid;
-  if (read(skt_master, &shmid, sizeof(int)) == -1)
-  {
-    perror("read()");
-    exit(EXIT_SUCCESS);
-  }
-
-  // attach the shared memory
-  void *addr;
-  if ((addr = shmat(shmid, NULL, 0)) == -1)
-  {
-    perror("shmat()");
-    exit(EXIT_FAILURE);
-  }
-  //
-
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  strce_to_send.op = CudaHostAlloc;
-  strce_to_send.syscall_type.cuda_host_alloc.pHost = *pHost;
-  strce_to_send.syscall_type.cuda_host_alloc.size = size;
-  strce_to_send.syscall_type.cuda_host_alloc.flags = flags;
-
-  // change pHost to point to the shared memory
-  *pHost = addr;
-
-  // record this function call
-  log_append(strce_to_send);
-}
-#endif
 
 
 //
@@ -515,27 +564,131 @@ cudaMallocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
 
   strce_to_send.op = CudaMallocPitch;
   strce_to_send.syscall_type.cuda_malloc_pitch.devPtr = *devPtr;
-  strce_to_send.syscall_type.cuda_malloc_pitch.pitch = pitch;
   strce_to_send.syscall_type.cuda_malloc_pitch.width = width;
   strce_to_send.syscall_type.cuda_malloc_pitch.height = height;
 
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
-  void *record_pointer = *devPtr;
-
   // change the pointer to point the global memory (device memory)
   *devPtr = rcvd_strce.syscall_type.cuda_malloc_pitch.devPtr;
+  *pitch = rcvd_strce.syscall_type.cuda_malloc_pitch.pitch;
 
-  // record this system call to the log file
-  // memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  strce_to_send.op = CudaMallocPitch;
-  // FIXME: should we save record_pointer or devPtr?
-  strce_to_send.syscall_type.cuda_malloc_pitch.devPtr = *devPtr;
-  // strce_to_send.syscall_type.cuda_malloc_pitch.pitch = pitch;
-  // strce_to_send.syscall_type.cuda_malloc_pitch.width = width;
-  // strce_to_send.syscall_type.cuda_malloc_pitch.height = height;
+  JNOTE("MY PLUG ====== cudaMallocPitch");
+  log_append(strce_to_send); // FIXME: Not sure it is sufficient for restart.
 
-  log_append(strce_to_send);
+  return ret_val;
+}
+
+
+EXTERNC cudaError_t
+cudaDeviceReset( void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+
+  strce_to_send.op = CudaDeviceReset;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(rcvd_strce);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaMemcpyToSymbol(const void * symbol, const void * src, size_t count, \
+                               size_t offset, enum cudaMemcpyKind kind)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+
+  strce_to_send.op = CudaMemcpyToSymbol;
+  strce_to_send.syscall_type.cuda_memcpy_to_symbol.symbol = symbol;
+  strce_to_send.syscall_type.cuda_memcpy_to_symbol.src = src;
+  strce_to_send.syscall_type.cuda_memcpy_to_symbol.count = count;
+  strce_to_send.syscall_type.cuda_memcpy_to_symbol.offset = offset;
+  strce_to_send.syscall_type.cuda_memcpy_to_symbol.kind = kind;
+
+  if (kind == cudaMemcpyHostToDevice){
+    strce_to_send.payload = src;
+    strce_to_send.payload_size = count;
+    send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  }
+  else if (kind == cudaMemcpyDeviceToDevice){
+    send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  }
+  else{
+    JASSERT(false)(kind).Text("Unknown direction for cudaMemcpyToSymbol");
+  }
+
+  log_append(rcvd_strce);
+
+  return ret_val;
+}
+
+EXTERNC cudaChannelFormatDesc
+cudaCreateChannelDesc(int x, int y, int z, int w, enum cudaChannelFormatKind f)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+  size_t size;
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+
+  strce_to_send.op = CudaCreateChannelDesc;
+  strce_to_send.syscall_type.cuda_create_channel_desc.x = x;
+  strce_to_send.syscall_type.cuda_create_channel_desc.y = y;
+  strce_to_send.syscall_type.cuda_create_channel_desc.z = z;
+  strce_to_send.syscall_type.cuda_create_channel_desc.w = w;
+  strce_to_send.syscall_type.cuda_create_channel_desc.f = f;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  JASSERT(ret_val == cudaSuccess)(ret_val).Text("cudaMemcpy failed");
+
+  JNOTE("MY PLUG ====== cudaCreateChannelDesc");
+
+  log_append(rcvd_strce);
+
+  return (rcvd_strce.syscall_type).cuda_create_channel_desc.ret_val;
+}
+
+EXTERNC cudaError_t
+cudaBindTexture2D(size_t * offset, const textureReference * texref, \
+                  const void * devPtr, const cudaChannelFormatDesc * desc, \
+                  size_t width, size_t height, size_t pitch)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+
+  strce_to_send.op = CudaBindTexture2D;
+  // strce_to_send.syscall_type.cuda_bind_texture2_d.offset = offset;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.texref = texref;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.devPtr = devPtr;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.desc = desc;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.width = width;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.height = height;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.pitch = pitch;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  // offset is an "out" parameter
+  *offset = (rcvd_strce.syscall_type).cuda_bind_texture2_d.offset;
+
+  JNOTE("MY PLUG ====== cudaBindTexture2D");
+  log_append(rcvd_strce);
 
   return ret_val;
 }
