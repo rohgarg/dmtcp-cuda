@@ -84,7 +84,10 @@ enum cuda_syscalls
   CudaDeviceReset,
   CudaMemcpyToSymbol,
   CudaCreateChannelDesc,
-  CudaBindTexture2D
+  CudaBindTexture2D,
+  /*-- Added to support HPGMG-CUDA */
+  CudaBindTexture,
+  CudaCreateTextureObject
 };
 
 
@@ -234,13 +237,25 @@ typedef struct
        // (*offset) is an "out" parameter. The value changes in the proxy.
        // we chose "offset" instead of "*offset", it's easier to code this way.
        size_t offset;
-       const struct textureReference * texref;
+       const textureReference * texref;
        const void  *devPtr;
-       const cudaChannelFormatDesc * desc;
+       // we chose "desc" instead of "*desc", it's easier to code this way.
+       struct cudaChannelFormatDesc desc;
        size_t width;
        size_t height;
        size_t pitch;
      } cuda_bind_texture2_d;
+
+
+     /* Added to support HPGMG-CUDA */
+     struct
+     {
+       size_t offset; // (*offset)
+       const textureReference *texref;
+       const void *devPtr;
+       struct cudaChannelFormatDesc desc; // (*desc)
+       size_t size;
+     } cuda_bind_texture;
   }syscall_type;
   const void *payload;
   size_t payload_size;
