@@ -204,11 +204,12 @@ int compute(int fd, cudaSyscallStructure *structure)
 
     case CudaMallocPitch:
      {
-      void **devPtr = &((structure->syscall_type).cuda_malloc_pitch.devPtr);
-      size_t *pitch = &((structure->syscall_type).cuda_malloc_pitch.pitch);
+      // void **devPtr = &((structure->syscall_type).cuda_malloc_pitch.devPtr);
+      // size_t *pitch = &((structure->syscall_type).cuda_malloc_pitch.pitch);
       size_t width = (structure->syscall_type).cuda_malloc_pitch.width;
       size_t height = (structure->syscall_type).cuda_malloc_pitch.height;
-      return_val =  cudaMallocPitch(devPtr, pitch, width, height);
+      return_val =  cudaMallocPitch(&((structure->syscall_type).cuda_malloc_pitch.devPtr), \
+                    &((structure->syscall_type).cuda_malloc_pitch.pitch), width, height);
      }
      break;
 
@@ -533,17 +534,17 @@ int compute(int fd, cudaSyscallStructure *structure)
      }
      break;
 
-    case CudaCreateTextureObject:
+/*    case CudaCreateTextureObject:
      {
        cudaTextureObject pTextObject;
        struct cudaResourceDesc pResDesc = (structure->syscall_type).cuda_createTextureObject.pResDesc;
        struct cudaTextureDesc pTexDesc = (structure->syscall_type).cuda_createTextureObject.pTexDesc;
        struct cudaResourceDesc pResViewDesc = (structure->syscall_type).cuda_createTextureObject.pResViewDesc;
        return_val = cudaCreateTextureObject(&pTextObject, &pResDesc, &pTexDesc, &pResViewDesc);
-       /* pTextObject is an "out" parameter */
+       // pTextObject is an "out" parameter
        structure->syscall_type.cuda_createTextureObject.pTextObject = pTextObject;
      }
-     break;
+     break;*/
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);
