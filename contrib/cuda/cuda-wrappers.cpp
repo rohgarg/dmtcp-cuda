@@ -728,7 +728,7 @@ cudaBindTexture(size_t * offset, const textureReference * texref, \
   return ret_val;
 }
 
-EXTERNC cudaError_t cudaCreateTextureObject (cudaTextureObject_t * pTexObject, \
+/*EXTERNC cudaError_t cudaCreateTextureObject (cudaTextureObject_t * pTexObject, \
   const struct cudaResourceDesc * pResDesc, \
   const struct cudaTextureDesc *pTexDesc, \
   const struct cudaResourceViewDesc * pResViewDesc)
@@ -753,4 +753,4 @@ EXTERNC cudaError_t cudaCreateTextureObject (cudaTextureObject_t * pTexObject, \
   log_append(strce_to_send);
 
   return ret_val;
-}
+}*/

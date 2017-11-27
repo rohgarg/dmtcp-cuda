@@ -256,6 +256,18 @@ typedef struct
        struct cudaChannelFormatDesc desc; // (*desc)
        size_t size;
      } cuda_bind_texture;
+
+    struct
+    {
+      /* (* pTexObject) is an "out" parameter. */
+      cudaTextureObject_t pTextObject;
+      /* (* pResDesc) will be passed as pointer in the proxy*/
+      struct cudaResourceDesc pResDesc;
+      /* (* pTexDesc) will be passed as pointer in the proxy*/
+      struct cudaTextureDesc pTexDesc;
+      /* (*pResViewDesc) will be passed as pointer in the proxy*/
+      struct cudaResourceViewDesc pResViewDesc;
+    } cuda_createTextureObject;
   }syscall_type;
   const void *payload;
   size_t payload_size;
