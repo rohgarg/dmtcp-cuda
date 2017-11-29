@@ -237,7 +237,7 @@ typedef struct
        // (*offset) is an "out" parameter. The value changes in the proxy.
        // we chose "offset" instead of "*offset", it's easier to code this way.
        size_t offset;
-       const textureReference * texref;
+       struct textureReference *texref;
        const void  *devPtr;
        // we chose "desc" instead of "*desc", it's easier to code this way.
        struct cudaChannelFormatDesc desc;
