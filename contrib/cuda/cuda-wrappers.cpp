@@ -11,7 +11,6 @@
 #include "config.h"
 #include "cuda_plugin.h"
 
-
 struct MallocRegion {
   void *addr;
   void *host_addr;
@@ -119,7 +118,6 @@ cudaFree(void *pointer)
   strce_to_send.op = CudaFree;
   strce_to_send.syscall_type.cuda_free.pointer = pointer;
 
-  JNOTE("MY PLUG ====== cudaFree");
   log_append(strce_to_send);
 
   return ret_val;
@@ -274,7 +272,6 @@ cudaMemcpy2D(void *dst, size_t dpitch, const void *src, size_t spitch,
 
     case cudaMemcpyDeviceToDevice:
       send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-
       break;
 
     default:
@@ -574,7 +571,6 @@ cudaMallocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
   *devPtr = rcvd_strce.syscall_type.cuda_malloc_pitch.devPtr;
   *pitch = rcvd_strce.syscall_type.cuda_malloc_pitch.pitch;
 
-  JNOTE("MY PLUG ====== cudaMallocPitch");
   log_append(strce_to_send); // FIXME: Not sure it is sufficient for restart.
 
   return ret_val;
@@ -656,7 +652,6 @@ cudaCreateChannelDesc(int x, int y, int z, int w, enum cudaChannelFormatKind f)
 
   JASSERT(ret_val == cudaSuccess)(ret_val).Text("cudaMemcpy failed");
 
-  JNOTE("MY PLUG ====== cudaCreateChannelDesc");
 
   log_append(rcvd_strce);
 
@@ -664,11 +659,11 @@ cudaCreateChannelDesc(int x, int y, int z, int w, enum cudaChannelFormatKind f)
 }
 
 EXTERNC cudaError_t
-cudaBindTexture2D(size_t * offset, const textureReference * texref, \
+cudaBindTexture2D(size_t * offset, const struct textureReference * texref, \
                   const void * devPtr, const cudaChannelFormatDesc * desc, \
                   size_t width, size_t height, size_t pitch)
 {
-  JNOTE("MY PLUG ====== cudaBindTexture2D");
+  JNOTE("texref addr: ")(texref);
   if (!initialized)
     proxy_initialize();
 
@@ -679,7 +674,9 @@ cudaBindTexture2D(size_t * offset, const textureReference * texref, \
   strce_to_send.op = CudaBindTexture2D;
   // a texture reference must be a global variable, hence
   // the pointer in the proxy process is valid as well.
-  strce_to_send.syscall_type.cuda_bind_texture2_d.texref = texref;
+  // strce_to_send.syscall_type.cuda_bind_texture2_d.offset = *offset;
+  strce_to_send.syscall_type.cuda_bind_texture2_d.texref = \
+                                     (struct textureReference*)texref;
   // devPtr is a pointer to memory on the device, which makes
   // it (devPtr) valid in the proxy process as well.
   strce_to_send.syscall_type.cuda_bind_texture2_d.devPtr = devPtr;
@@ -687,12 +684,10 @@ cudaBindTexture2D(size_t * offset, const textureReference * texref, \
   strce_to_send.syscall_type.cuda_bind_texture2_d.width = width;
   strce_to_send.syscall_type.cuda_bind_texture2_d.height = height;
   strce_to_send.syscall_type.cuda_bind_texture2_d.pitch = pitch;
-  JNOTE("MY PLUG ====== cudaBindTexture2D");
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
   // offset is an "out" parameter
-  *offset = (rcvd_strce.syscall_type).cuda_bind_texture2_d.offset;
+  // *offset = (rcvd_strce.syscall_type).cuda_bind_texture2_d.offset;
 
-  JNOTE("MY PLUG ====== cudaBindTexture2D");
   log_append(rcvd_strce);
 
   return ret_val;
@@ -722,7 +717,6 @@ cudaBindTexture(size_t * offset, const textureReference * texref, \
   // offset is an "out" parameter
   *offset = (rcvd_strce.syscall_type).cuda_bind_texture.offset;
 
-  JNOTE("MY PLUG ====== cudaBindTexture");
   log_append(strce_to_send);
 
   return ret_val;
@@ -749,7 +743,6 @@ cudaBindTexture(size_t * offset, const textureReference * texref, \
 
   *pTexObject = rcvd_strce.syscall_type.cuda_createTextureObject.pTexObject;
 
-  JNOTE("MY PLUG ====== cudaCreateTextureObject");
   log_append(strce_to_send);
 
   return ret_val;

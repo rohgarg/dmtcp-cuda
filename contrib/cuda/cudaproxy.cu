@@ -269,16 +269,17 @@ int compute(int fd, cudaSyscallStructure *structure)
     case CudaBindTexture2D:
     {
       // offset is an "out" parameter.
-      size_t offset;
+      //size_t offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
       // size_t * offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
-      const textureReference * texref = (structure->syscall_type).cuda_bind_texture2_d.texref;
+      struct textureReference *texref = (structure->syscall_type).cuda_bind_texture2_d.texref;
       const void * devPtr = (structure->syscall_type).cuda_bind_texture2_d.devPtr;
       const cudaChannelFormatDesc desc = (structure->syscall_type).cuda_bind_texture2_d.desc;
       size_t width = (structure->syscall_type).cuda_bind_texture2_d.width;
       size_t height = (structure->syscall_type).cuda_bind_texture2_d.height;
       size_t pitch = (structure->syscall_type).cuda_bind_texture2_d.pitch;
-      return_val = cudaBindTexture2D(&offset, texref, devPtr, &desc, width, height, pitch);
-      (structure->syscall_type).cuda_bind_texture2_d.offset = offset;
+      return_val = cudaBindTexture2D(NULL, texref, devPtr, &desc, width, height, pitch);
+      printf("Return Value: %d \n", return_val);
+      //(structure->syscall_type).cuda_bind_texture2_d.offset = offset;
     }
     break;
 
