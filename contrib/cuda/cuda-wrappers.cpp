@@ -65,9 +65,6 @@ cudaMalloc(void **pointer, size_t size)
   strce_to_send.syscall_type.cuda_malloc.pointer = *pointer;
   strce_to_send.syscall_type.cuda_malloc.size = size;
 
-  /* for testing */
-  printf("wrappers(cudaMalloc): before send_recv\n");
-  /* end: for testing */
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   if (should_log_cuda_calls()) {
@@ -88,9 +85,6 @@ cudaMalloc(void **pointer, size_t size)
     MallocRegion r =  {.addr = *pointer, .host_addr = NULL, .len = size};
     allMallocRegions().push_back(r);
   }
-  /* for testing */
-  printf("wrappers(cudaMalloc): before return\n");
-  /* end: for testing */
 
   return ret_val;
 }
@@ -663,7 +657,6 @@ cudaBindTexture2D(size_t * offset, const struct textureReference * texref, \
                   const void * devPtr, const cudaChannelFormatDesc * desc, \
                   size_t width, size_t height, size_t pitch)
 {
-  JNOTE("texref addr: ")(texref);
   if (!initialized)
     proxy_initialize();
 
@@ -672,6 +665,10 @@ cudaBindTexture2D(size_t * offset, const struct textureReference * texref, \
   memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
 
   strce_to_send.op = CudaBindTexture2D;
+  if (offset == NULL)
+    strce_to_send.syscall_type.cuda_bind_texture2_d.offset = 0;
+  else
+    strce_to_send.syscall_type.cuda_bind_texture2_d.offset = *offset;
   // a texture reference must be a global variable, hence
   // the pointer in the proxy process is valid as well.
   // strce_to_send.syscall_type.cuda_bind_texture2_d.offset = *offset;
@@ -686,7 +683,8 @@ cudaBindTexture2D(size_t * offset, const struct textureReference * texref, \
   strce_to_send.syscall_type.cuda_bind_texture2_d.pitch = pitch;
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
   // offset is an "out" parameter
-  // *offset = (rcvd_strce.syscall_type).cuda_bind_texture2_d.offset;
+  if (offset != NULL)
+    *offset = (rcvd_strce.syscall_type).cuda_bind_texture2_d.offset;
 
   log_append(rcvd_strce);
 
@@ -695,7 +693,7 @@ cudaBindTexture2D(size_t * offset, const struct textureReference * texref, \
 
 EXTERNC cudaError_t
 cudaBindTexture(size_t * offset, const textureReference * texref, \
-  const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
+const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
 {
   if (!initialized)
     proxy_initialize();
@@ -705,6 +703,10 @@ cudaBindTexture(size_t * offset, const textureReference * texref, \
 
   memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
   strce_to_send.op = CudaBindTexture;
+  if (offset == NULL)
+    strce_to_send.syscall_type.cuda_bind_texture.offset = 0;
+  else
+    strce_to_send.syscall_type.cuda_bind_texture.offset = *offset;
   // a texture reference must be a global variable, hence
   // the pointer in the proxy process is valid as well.
   strce_to_send.syscall_type.cuda_bind_texture.texref = texref;
@@ -715,7 +717,8 @@ cudaBindTexture(size_t * offset, const textureReference * texref, \
   strce_to_send.syscall_type.cuda_bind_texture.size = size;
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
   // offset is an "out" parameter
-  *offset = (rcvd_strce.syscall_type).cuda_bind_texture.offset;
+  if (offset != NULL)
+    *offset = (rcvd_strce.syscall_type).cuda_bind_texture.offset;
 
   log_append(strce_to_send);
 

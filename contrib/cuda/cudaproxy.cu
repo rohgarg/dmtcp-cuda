@@ -194,10 +194,8 @@ int compute(int fd, cudaSyscallStructure *structure)
 
     case CudaMalloc:
      {
-      printf("proxy: cudaMalloc()\n");
       return_val =  cudaMalloc(&((structure->syscall_type).cuda_malloc.pointer),
         (structure->syscall_type).cuda_malloc.size);
-      printf("%d\n", return_val);
      }
      break;
 
@@ -278,7 +276,6 @@ int compute(int fd, cudaSyscallStructure *structure)
       size_t height = (structure->syscall_type).cuda_bind_texture2_d.height;
       size_t pitch = (structure->syscall_type).cuda_bind_texture2_d.pitch;
       return_val = cudaBindTexture2D(NULL, texref, devPtr, &desc, width, height, pitch);
-      printf("Return Value: %d \n", return_val);
       //(structure->syscall_type).cuda_bind_texture2_d.offset = offset;
     }
     break;
