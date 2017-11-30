@@ -65,9 +65,6 @@ cudaMalloc(void **pointer, size_t size)
   strce_to_send.syscall_type.cuda_malloc.pointer = *pointer;
   strce_to_send.syscall_type.cuda_malloc.size = size;
 
-  /* for testing */
-  printf("wrappers(cudaMalloc): before send_recv\n");
-  /* end: for testing */
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   if (should_log_cuda_calls()) {
@@ -86,11 +83,7 @@ cudaMalloc(void **pointer, size_t size)
     log_append(strce_to_send);
 
     MallocRegion r =  {.addr = *pointer, .host_addr = NULL, .len = size};
-    allMallocRegions().push_back(r);
   }
-  /* for testing */
-  printf("wrappers(cudaMalloc): before return\n");
-  /* end: for testing */
 
   return ret_val;
 }
@@ -663,7 +656,6 @@ cudaBindTexture2D(size_t * offset, const struct textureReference * texref, \
                   const void * devPtr, const cudaChannelFormatDesc * desc, \
                   size_t width, size_t height, size_t pitch)
 {
-  JNOTE("texref addr: ")(texref);
   if (!initialized)
     proxy_initialize();
 
