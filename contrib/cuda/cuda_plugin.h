@@ -87,7 +87,8 @@ enum cuda_syscalls
   CudaBindTexture2D,
   /*-- Added to support HPGMG-CUDA */
   CudaBindTexture,
-  CudaCreateTextureObject
+  CudaCreateTextureObject,
+  CudaDestroyTextureObject
 };
 
 
@@ -267,7 +268,12 @@ typedef struct
       struct cudaTextureDesc pTexDesc;
       /* (*pResViewDesc) will be passed as pointer in the proxy*/
       struct cudaResourceViewDesc pResViewDesc;
-    } cuda_createTextureObject;
+    } cuda_create_texture_object;
+
+    struct
+    {
+      cudaTextureObject_t texObject;
+    }cuda_destroy_texture_object;
   }syscall_type;
   const void *payload;
   size_t payload_size;

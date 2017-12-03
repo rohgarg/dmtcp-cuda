@@ -737,13 +737,32 @@ const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
 
   memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
   strce_to_send.op = CudaCreateTextureObject;
-  strce_to_send.syscall_type.cuda_createTextureObject.pResDesc = *pResDesc;
-  strce_to_send.syscall_type.cuda_createTextureObject.pTexDesc =  *pTexDesc;
-  strce_to_send.syscall_type.cuda_createTextureObject.pResViewDesc = \
+  strce_to_send.syscall_type.cuda_create_texture_object.pResDesc = *pResDesc;
+  strce_to_send.syscall_type.cuda_create_texture_object.pTexDesc =  *pTexDesc;
+  strce_to_send.syscall_type.cuda_create_texture_object.pResViewDesc = \
                                                     *pResViewDesc;
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
-  *pTexObject = rcvd_strce.syscall_type.cuda_createTextureObject.pTexObject;
+  *pTexObject = rcvd_strce.syscall_type.cuda_create_texture_object.pTexObject;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaDestroyTextureObject (cudaTextureObject_t texObject)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaDestroyTextureObject;
+  strce_to_send.syscall_type.cuda_destroy_texture_object.texObject = texObject;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   log_append(strce_to_send);
 
