@@ -546,7 +546,13 @@ int compute(int fd, cudaSyscallStructure *structure)
 
      case CudaDestroyTextureObject:
      {
-       return_val = cudaCreateTextureObject((structure->syscall_type).cuda_createTextureObject.texObject);
+       return_val = cudaDestroyTextureObject((structure->syscall_type).cuda_createTextureObject.texObject);
+     }
+     break;
+
+     case CudaEventDestroy:
+     {
+       return_val = cudaEventDestroy((structure->syscall_type).cuda_createTextureObject.event);
      }
      break;
 */
