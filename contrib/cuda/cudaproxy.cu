@@ -542,7 +542,14 @@ int compute(int fd, cudaSyscallStructure *structure)
        // pTextObject is an "out" parameter
        structure->syscall_type.cuda_createTextureObject.pTextObject = pTextObject;
      }
-     break;*/
+     break;
+
+     case CudaDestroyTextureObject:
+     {
+       return_val = cudaCreateTextureObject((structure->syscall_type).cuda_createTextureObject.texObject);
+     }
+     break;
+*/
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);
