@@ -767,4 +767,24 @@ cudaDestroyTextureObject (cudaTextureObject_t texObject)
   log_append(strce_to_send);
 
   return ret_val;
+}
+
+
+EXTERNC cudaError_t
+cudaEventDestroy (cudaEvent_t event)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaEventDestroy;
+  strce_to_send.syscall_type.cuda_event_destroy.event = event;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
 }*/

@@ -88,7 +88,8 @@ enum cuda_syscalls
   /*-- Added to support HPGMG-CUDA */
   CudaBindTexture,
   CudaCreateTextureObject,
-  CudaDestroyTextureObject
+  CudaDestroyTextureObject,
+  CudaEventDestroy
 };
 
 
@@ -274,6 +275,11 @@ typedef struct
     {
       cudaTextureObject_t texObject;
     }cuda_destroy_texture_object;
+
+    struct
+    {
+      cudaEvent_t event;
+    } cuda_event_destroy;
   }syscall_type;
   const void *payload;
   size_t payload_size;
