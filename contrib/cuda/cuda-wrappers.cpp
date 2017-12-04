@@ -806,4 +806,25 @@ cudaEventQuery (cudaEvent_t event)
   log_append(strce_to_send);
 
   return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaFreeHost(void *ptr)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaFreeHost;
+  strce_to_send.syscall_type.cuda_free.ptr = ptr;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
 }*/
