@@ -286,6 +286,11 @@ typedef struct
     {
       cudaEvent_t event;
     } cuda_event_query;
+
+    struct
+    {
+      void *ptr;
+    } cuda_free_host;
   }syscall_type;
   const void *payload;
   size_t payload_size;
