@@ -89,7 +89,8 @@ enum cuda_syscalls
   CudaBindTexture,
   CudaCreateTextureObject,
   CudaDestroyTextureObject,
-  CudaEventDestroy
+  CudaEventDestroy,
+  CudaEventQuery
 };
 
 
@@ -280,6 +281,11 @@ typedef struct
     {
       cudaEvent_t event;
     } cuda_event_destroy;
+
+    struct
+    {
+      cudaEvent_t event;
+    } cuda_event_query;
   }syscall_type;
   const void *payload;
   size_t payload_size;

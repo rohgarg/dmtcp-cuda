@@ -555,6 +555,12 @@ int compute(int fd, cudaSyscallStructure *structure)
        return_val = cudaEventDestroy((structure->syscall_type).cuda_createTextureObject.event);
      }
      break;
+
+     case CudaEventQuery:
+     {
+       return_val = cudaEventQuery((structure->syscall_type).cuda_createTextureObject.event);
+     }
+     break;
 */
     default:
       printf("bad op value: %d\n", (int) op);
