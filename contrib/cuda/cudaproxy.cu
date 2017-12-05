@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include <cuda_profiler_api.h>
 
 #ifdef USE_SHM
 # include <sys/ipc.h>
@@ -267,7 +268,7 @@ int compute(int fd, cudaSyscallStructure *structure)
     case CudaBindTexture2D:
     {
       // offset is an "out" parameter.
-      //size_t offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
+      size_t offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
       // size_t * offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
       struct textureReference *texref = (structure->syscall_type).cuda_bind_texture2_d.texref;
       const void * devPtr = (structure->syscall_type).cuda_bind_texture2_d.devPtr;
@@ -275,20 +276,26 @@ int compute(int fd, cudaSyscallStructure *structure)
       size_t width = (structure->syscall_type).cuda_bind_texture2_d.width;
       size_t height = (structure->syscall_type).cuda_bind_texture2_d.height;
       size_t pitch = (structure->syscall_type).cuda_bind_texture2_d.pitch;
-      return_val = cudaBindTexture2D(NULL, texref, devPtr, &desc, width, height, pitch);
-      //(structure->syscall_type).cuda_bind_texture2_d.offset = offset;
+      if (offset == 0)
+        return_val = cudaBindTexture2D(NULL, texref, devPtr, &desc, width, height, pitch);
+      else
+        return_val = cudaBindTexture2D(&offset, texref, devPtr, &desc, width, height, pitch);
+        (structure->syscall_type).cuda_bind_texture2_d.offset = offset;
     }
     break;
 
     case CudaBindTexture:
     {
       // offset is an "out" parameter.
-      size_t offset;
+      size_t offset = (structure->syscall_type).cuda_bind_texture.offset;
       const textureReference * texref = (structure->syscall_type).cuda_bind_texture.texref;
       const void * devPtr = (structure->syscall_type).cuda_bind_texture.devPtr;
       const cudaChannelFormatDesc desc = (structure->syscall_type).cuda_bind_texture.desc;
       size_t size = (structure->syscall_type).cuda_bind_texture.size;
-      return_val = cudaBindTexture(&offset, texref, devPtr, &desc, size);
+      if (offset == 0)
+        return_val = cudaBindTexture(NULL, texref, devPtr, &desc, size);
+      else
+        return_val = cudaBindTexture(&offset, texref, devPtr, &desc, size);
       (structure->syscall_type).cuda_bind_texture.offset = offset;
     }
     break;
@@ -532,42 +539,77 @@ int compute(int fd, cudaSyscallStructure *structure)
      }
      break;
 
-/*    case CudaCreateTextureObject:
+    case CudaPeekAtLastError:
+    {
+      return_val = cudaPeekAtLastError();
+    }
+    break;
+
+    case CudaProfilerStart:
+    {
+      return_val = cudaProfilerStart();
+    }
+    break;
+
+    case CudaProfilerStop:
+    {
+      return_val = cudaProfilerStop();
+    }
+    break;
+
+    case CudaStreamSynchronize:
+    {
+      cudaStream_t stream;
+      stream = (structure->syscall_type).cuda_stream_synchronize.stream;
+      return_val = cudaStreamSynchronize(stream);
+    }
+    break;
+
+    case CudaUnbindTexture:
+    {
+      const textureReference* texref;
+      texref = (structure->syscall_type).cuda_unbind_texture.texref;
+      return_val = cudaUnbindTexture(texref);
+    }
+    break;
+
+
+    case CudaCreateTextureObject:
      {
-       cudaTextureObject pTextObject;
-       struct cudaResourceDesc pResDesc = (structure->syscall_type).cuda_createTextureObject.pResDesc;
-       struct cudaTextureDesc pTexDesc = (structure->syscall_type).cuda_createTextureObject.pTexDesc;
-       struct cudaResourceDesc pResViewDesc = (structure->syscall_type).cuda_createTextureObject.pResViewDesc;
-       return_val = cudaCreateTextureObject(&pTextObject, &pResDesc, &pTexDesc, &pResViewDesc);
+       cudaTextureObject_t pTexObject;
+       struct cudaResourceDesc pResDesc = (structure->syscall_type).cuda_create_texture_object.pResDesc;
+       struct cudaTextureDesc pTexDesc = (structure->syscall_type).cuda_create_texture_object.pTexDesc;
+       struct cudaResourceViewDesc pResViewDesc = (structure->syscall_type).cuda_create_texture_object.pResViewDesc;
+       return_val = cudaCreateTextureObject(&pTexObject, &pResDesc, &pTexDesc, &pResViewDesc);
        // pTextObject is an "out" parameter
-       structure->syscall_type.cuda_createTextureObject.pTextObject = pTextObject;
+       structure->syscall_type.cuda_create_texture_object.pTexObject = pTexObject;
      }
      break;
 
      case CudaDestroyTextureObject:
      {
-       return_val = cudaDestroyTextureObject((structure->syscall_type).cuda_createTextureObject.texObject);
+       return_val = cudaDestroyTextureObject((structure->syscall_type).cuda_destroy_texture_object.texObject);
      }
      break;
 
      case CudaEventDestroy:
      {
-       return_val = cudaEventDestroy((structure->syscall_type).cuda_createTextureObject.event);
+       return_val = cudaEventDestroy((structure->syscall_type).cuda_event_destroy.event);
      }
      break;
 
      case CudaEventQuery:
      {
-       return_val = cudaEventQuery((structure->syscall_type).cuda_createTextureObject.event);
+       return_val = cudaEventQuery((structure->syscall_type).cuda_event_query.event);
      }
      break;
 
     case CudaFreeHost:
     {
-      return_val = cudaFreeHost((structure->syscall_type).cuda_free.ptr);
+      return_val = cudaFreeHost((structure->syscall_type).cuda_free_host.ptr);
     }
     break;
-*/
+
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);

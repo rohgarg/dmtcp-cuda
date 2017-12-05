@@ -88,9 +88,15 @@ enum cuda_syscalls
   /*-- Added to support HPGMG-CUDA */
   CudaBindTexture,
   CudaCreateTextureObject,
+  CudaPeekAtLastError,
+  CudaProfilerStart,
+  CudaProfilerStop,
+  CudaStreamSynchronize,
+  CudaUnbindTexture,
   CudaDestroyTextureObject,
   CudaEventDestroy,
-  CudaEventQuery
+  CudaEventQuery,
+  CudaFreeHost
 };
 
 
@@ -249,7 +255,6 @@ typedef struct
        size_t pitch;
      } cuda_bind_texture2_d;
 
-
      /* Added to support HPGMG-CUDA */
      struct
      {
@@ -263,7 +268,7 @@ typedef struct
     struct
     {
       /* (* pTexObject) is an "out" parameter. */
-      cudaTextureObject_t pTextObject;
+      cudaTextureObject_t pTexObject;
       /* (* pResDesc) will be passed as pointer in the proxy*/
       struct cudaResourceDesc pResDesc;
       /* (* pTexDesc) will be passed as pointer in the proxy*/
@@ -279,8 +284,18 @@ typedef struct
 
     struct
     {
+      cudaStream_t stream;
+    } cuda_stream_synchronize;
+
+    struct
+    {
       cudaEvent_t event;
     } cuda_event_destroy;
+
+    struct
+    {
+      const textureReference* texref;
+    } cuda_unbind_texture;
 
     struct
     {
