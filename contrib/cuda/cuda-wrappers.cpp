@@ -921,3 +921,53 @@ cudaFreeHost(void *ptr)
 
   return ret_val;
 }
+
+EXTERNC cudaError_t
+cudaDeviceCanAccessPeer (int* canAccessPeer, int device, int peerDevice)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaDeviceCanAccessPeer;
+  strce_to_send.syscall_type.cuda_device_can_access_peer.device = device;
+  strce_to_send.syscall_type.cuda_device_can_access_peer.\
+                                       peerDevice = peerDevice;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  *canAccessPeer = strce_to_send.syscall_type.cuda_device_can_access_peer.\
+                                                             canAccessPeer;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaDeviceGetAttribute (int* value, cudaDeviceAttr attr, int device)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaDeviceGetAttribute;
+  strce_to_send.syscall_type.cuda_device_get_attribute.attr = attr;
+  strce_to_send.syscall_type.cuda_device_get_attribute.device = device;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  *value = strce_to_send.syscall_type.cuda_device_get_attribute.value;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}

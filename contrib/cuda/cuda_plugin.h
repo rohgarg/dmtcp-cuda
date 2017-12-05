@@ -96,7 +96,9 @@ enum cuda_syscalls
   CudaDestroyTextureObject,
   CudaEventDestroy,
   CudaEventQuery,
-  CudaFreeHost
+  CudaFreeHost,
+  CudaDeviceCanAccessPeer,
+  CudaDeviceGetAttribute
 };
 
 
@@ -306,6 +308,21 @@ typedef struct
     {
       void *ptr;
     } cuda_free_host;
+
+    struct
+    {
+      int canAccessPeer; // int instead of (int *) \
+                            since the value change in the proxy.
+      int device;
+      int peerDevice;
+    } cuda_device_can_access_peer;
+
+    struct
+    {
+      int value; // int instead of (int *) since the value change in the proxy.
+      cudaDeviceAttr attr;
+      int device;
+    }cuda_device_get_attribute;
   }syscall_type;
   const void *payload;
   size_t payload_size;

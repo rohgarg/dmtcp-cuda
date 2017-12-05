@@ -610,6 +610,26 @@ int compute(int fd, cudaSyscallStructure *structure)
     }
     break;
 
+    case CudaDeviceCanAccessPeer:
+    {
+      int canAccessPeer;
+      int device = (structure->syscall_type).cuda_device_can_access_peer.device;
+      int peerDevice = (structure->syscall_type).cuda_device_can_access_peer.peerDevice;
+      return_val = cudaDeviceCanAccessPeer (&canAccessPeer, device, peerDevice);
+      (structure->syscall_type).cuda_device_can_access_peer.canAccessPeer = canAccessPeer;
+    }
+    break;
+
+    case CudaDeviceGetAttribute:
+    {
+      int value;
+      cudaDeviceAttr attr = (structure->syscall_type).cuda_device_get_attribute.attr;
+      int device = (structure->syscall_type).cuda_device_get_attribute.device;
+      return_val = cudaDeviceGetAttribute(&value, attr, device);
+      (structure->syscall_type).cuda_device_get_attribute.value = value;
+    }
+    break;
+
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);
