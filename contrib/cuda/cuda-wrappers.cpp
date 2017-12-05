@@ -83,6 +83,7 @@ cudaMalloc(void **pointer, size_t size)
     log_append(strce_to_send);
 
     MallocRegion r =  {.addr = *pointer, .host_addr = NULL, .len = size};
+    allMallocRegions().push_back(r);
   }
 
   return ret_val;
@@ -724,7 +725,7 @@ const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
   return ret_val;
 }
 
-/*EXTERNC cudaError_t cudaCreateTextureObject (cudaTextureObject_t * pTexObject, \
+EXTERNC cudaError_t cudaCreateTextureObject (cudaTextureObject_t * pTexObject, \
   const struct cudaResourceDesc * pResDesc, \
   const struct cudaTextureDesc *pTexDesc, \
   const struct cudaResourceViewDesc * pResViewDesc)
@@ -744,6 +745,98 @@ const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   *pTexObject = rcvd_strce.syscall_type.cuda_create_texture_object.pTexObject;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaPeekAtLastError(void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaPeekAtLastError;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaProfilerStart(void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaProfilerStart;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaProfilerStop(void)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaProfilerStop;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaStreamSynchronize(cudaStream_t stream)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaStreamSynchronize;
+  strce_to_send.syscall_type.cuda_stream_synchronize.stream = stream;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaUnbindTexture (const textureReference* texref)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  strce_to_send.op = CudaUnbindTexture;
+  strce_to_send.syscall_type.cuda_unbind_texture.texref = texref;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   log_append(strce_to_send);
 
@@ -821,10 +914,10 @@ cudaFreeHost(void *ptr)
   memset(&rcvd_strce, 0, sizeof(rcvd_strce));
 
   strce_to_send.op = CudaFreeHost;
-  strce_to_send.syscall_type.cuda_free.ptr = ptr;
+  strce_to_send.syscall_type.cuda_free_host.ptr = ptr;
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   log_append(strce_to_send);
 
   return ret_val;
-}*/
+}
