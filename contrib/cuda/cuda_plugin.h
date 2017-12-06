@@ -76,7 +76,6 @@ enum cuda_syscalls
   CudaConfigureCall,
   CudaSetupArgument,
   CudaLaunch,
-  CudaDeviceSync,
   CudaThreadSync,
   CudaGetLastError,
   CudaGetErrorString,
@@ -98,7 +97,15 @@ enum cuda_syscalls
   CudaEventQuery,
   CudaFreeHost,
   CudaDeviceCanAccessPeer,
-  CudaDeviceGetAttribute
+  CudaDeviceGetAttribute,
+  CudaDeviceSetCacheConfig,
+  CudaDeviceSetSharedMemConfig,
+  CudaDeviceSynchronize,
+  CudaEventCreateWithFlags,
+  CudaEventRecord,
+  CudaFuncGetAttributes,
+  CudaGetDevice,
+  CudaGetDeviceCount // here
 };
 
 
@@ -312,17 +319,57 @@ typedef struct
     struct
     {
       int canAccessPeer; // int instead of (int *) \
-                            since the value change in the proxy.
+                            since the value changes in the proxy.
       int device;
       int peerDevice;
     } cuda_device_can_access_peer;
 
     struct
     {
-      int value; // int instead of (int *) since the value change in the proxy.
+      int value; // int instead of (int *) since the value changes in the proxy.
       cudaDeviceAttr attr;
       int device;
     }cuda_device_get_attribute;
+
+    struct
+    {
+      cudaFuncCache cacheConfig;
+    } cuda_deviceSetCacheConfig;
+
+    struct
+    {
+      cudaSharedMemConfig config;
+    } cuda_deviceSetSharedMemConfig;
+
+    struct
+    {
+      cudaEvent_t event; // event instead of (event *) since
+                         // the value changes in the proxy.
+      unsigned int flags;
+    } cuda_eventCreateWithFlags;
+
+    struct
+    {
+      cudaEvent_t event;
+      cudaStream_t stream;
+    } cuda_eventRecord;
+
+    struct
+    {
+      cudaFuncAttributes attr; // attr instead of (* attr) since the value
+                               // changes in the proxy.
+      const void *func;
+    } cuda_funcGetAttributes;
+
+    struct
+    {
+      int device; // int instead of (int *) size the value changes in the proxy.
+    } cuda_getDevice;
+
+    struct
+    {
+      int count; // int instead of (int *) size the value changes in the proxy.
+    } cuda_getDeviceCount;
   }syscall_type;
   const void *payload;
   size_t payload_size;
