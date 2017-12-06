@@ -171,7 +171,7 @@ int compute(int fd, cudaSyscallStructure *structure)
   switch (op)
   {
     //
-    case CudaDeviceSync:
+    case CudaDeviceSynchronize:
       return_val = cudaDeviceSynchronize();
       break;
 
@@ -627,6 +627,63 @@ int compute(int fd, cudaSyscallStructure *structure)
       int device = (structure->syscall_type).cuda_device_get_attribute.device;
       return_val = cudaDeviceGetAttribute(&value, attr, device);
       (structure->syscall_type).cuda_device_get_attribute.value = value;
+    }
+    break;
+
+    case CudaDeviceSetCacheConfig:
+    {
+      cudaFuncCache cacheConfig = (structure->syscall_type).cuda_deviceSetCacheConfig.cacheConfig;
+      return_val = cudaDeviceSetCacheConfig(cacheConfig);
+    }
+    break;
+
+    case CudaDeviceSetSharedMemConfig:
+    {
+      cudaSharedMemConfig config = (structure->syscall_type).cuda_deviceSetSharedMemConfig.config;
+      return_val = cudaDeviceSetSharedMemConfig(config);
+    }
+    break;
+
+    case CudaEventCreateWithFlags:
+    {
+      cudaEvent_t event;
+      unsigned int flags = (structure->syscall_type).cuda_eventCreateWithFlags.flags;
+      return_val = cudaEventCreateWithFlags(&event, flags);
+      (structure->syscall_type).cuda_eventCreateWithFlags.event = event;
+    }
+    break;
+
+    case CudaEventRecord:
+    {
+      cudaEvent_t event = (structure->syscall_type).cuda_eventRecord.event;
+      cudaStream_t stream = (structure->syscall_type).cuda_eventRecord.stream;
+
+      return_val = cudaEventRecord(event, stream);
+    }
+    break;
+
+    case CudaFuncGetAttributes:
+    {
+      cudaFuncAttributes attr;
+      const void *func = (structure->syscall_type).cuda_funcGetAttributes.func;
+      return_val = cudaFuncGetAttributes(&attr, func);
+      (structure->syscall_type).cuda_funcGetAttributes.attr = attr;
+    }
+    break;
+
+    case CudaGetDevice:
+    {
+      int device;
+      return_val = cudaGetDevice(&device);
+      (structure->syscall_type).cuda_getDevice.device = device;
+    }
+    break;
+
+    case CudaGetDeviceCount:
+    {
+      int count;
+      return_val = cudaGetDeviceCount(&count);
+      (structure->syscall_type).cuda_getDeviceCount.count = count;
     }
     break;
 

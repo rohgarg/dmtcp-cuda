@@ -456,28 +456,6 @@ cudaLaunch(const void *func)
 }
 
 EXTERNC cudaError_t
-cudaDeviceSynchronize(void)
-{
-  if (!initialized)
-    proxy_initialize();
-
-  cudaSyscallStructure strce_to_send, rcvd_strce;
-  memset(&strce_to_send, 0, sizeof(strce_to_send));
-  cudaError_t ret_val;
-
-  strce_to_send.op = CudaDeviceSync;
-
-  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-
-  memset(&strce_to_send, 0, sizeof(strce_to_send));
-  strce_to_send.op = CudaDeviceSync;
-
-  log_append(strce_to_send);
-
-  return ret_val;
-}
-
-EXTERNC cudaError_t
 cudaThreadSynchronize(void)
 {
   if (!initialized)
@@ -966,6 +944,182 @@ cudaDeviceGetAttribute (int* value, cudaDeviceAttr attr, int device)
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   *value = strce_to_send.syscall_type.cuda_device_get_attribute.value;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaDeviceSetCacheConfig (cudaFuncCache cacheConfig)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaDeviceSetCacheConfig;
+  strce_to_send.syscall_type.cuda_deviceSetCacheConfig.\
+                                  cacheConfig = cacheConfig;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaDeviceSetSharedMemConfig (cudaSharedMemConfig config)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaDeviceSetSharedMemConfig;
+  strce_to_send.syscall_type.cuda_deviceSetSharedMemConfig.config = config;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaDeviceSynchronize ( void )
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaDeviceSynchronize;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaEventCreateWithFlags ( cudaEvent_t* event, unsigned int  flags )
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaEventCreateWithFlags;
+  strce_to_send.syscall_type.cuda_eventCreateWithFlags.flags = flags;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  *event = rcvd_strce.syscall_type.cuda_eventCreateWithFlags.event;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaEventRecord(cudaEvent_t event, cudaStream_t stream)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaEventRecord;
+  strce_to_send.syscall_type.cuda_eventRecord.event = event;
+  strce_to_send.syscall_type.cuda_eventRecord.stream = stream;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaFuncGetAttributes(cudaFuncAttributes* attr, const void* func)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaFuncGetAttributes;
+  // func(pointer) is valid in the proxy as well.
+  strce_to_send.syscall_type.cuda_funcGetAttributes.func = func;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  // attr is an "out" parameter.
+  *attr = rcvd_strce.syscall_type.cuda_funcGetAttributes.attr;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaGetDevice ( int* device )
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaGetDevice;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  // device is an "out" parameter.
+  *device = rcvd_strce.syscall_type.cuda_getDevice.device;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaGetDeviceCount(int* count)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaGetDeviceCount;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  // count is an "out" parameter.
+  *count = rcvd_strce.syscall_type.cuda_getDeviceCount.count;
 
   log_append(strce_to_send);
 
