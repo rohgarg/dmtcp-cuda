@@ -105,7 +105,13 @@ enum cuda_syscalls
   CudaEventRecord,
   CudaFuncGetAttributes,
   CudaGetDevice,
-  CudaGetDeviceCount // here
+  CudaGetDeviceCount,
+  CudaGetDeviceProperties,
+  CudaMallocHost, // to be revisited
+  CudaMemcpyAsync, // to be revisited
+  CudaMemset,
+  CudaMemsetAsync, // to be revisited
+  CudaSetDevice // here
 };
 
 
@@ -370,6 +376,33 @@ typedef struct
     {
       int count; // int instead of (int *) size the value changes in the proxy.
     } cuda_getDeviceCount;
+
+    struct
+    {
+      cudaDeviceProp prop; // the value changes in the proxy.
+      int device;
+    } cuda_getDeviceProperties;
+
+    struct
+    {
+      void *dst;
+      const void *src;
+      size_t count;
+      cudaMemcpyKind kind;
+      cudaStream_t stream;
+    } cuda_memcpyAsync;
+
+    struct
+    {
+      void *devPtr;
+      int value;
+      size_t count;
+    } cuda_memset;
+
+    struct
+    {
+      int  device;
+    } cuda_setDevice;
   }syscall_type;
   const void *payload;
   size_t payload_size;

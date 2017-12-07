@@ -687,6 +687,31 @@ int compute(int fd, cudaSyscallStructure *structure)
     }
     break;
 
+    case CudaGetDeviceProperties:
+    {
+      cudaDeviceProp prop;
+      int device = (structure->syscall_type).cuda_getDeviceProperties.device;
+      return_val = cudaGetDeviceProperties(&prop, device);
+      (structure->syscall_type).cuda_getDeviceProperties.prop = prop;
+    }
+    break;
+
+    case CudaMemset:
+    {
+      void *devPtr = (structure->syscall_type).cuda_memset.devPtr;
+      int value = (structure->syscall_type).cuda_memset.value;
+      size_t count = (structure->syscall_type).cuda_memset.count;
+      return_val = cudaMemset(devPtr, value, count);
+    }
+    break;
+
+    case CudaSetDevice:
+    {
+      int device = (structure->syscall_type).cuda_setDevice.device;
+      return_val = cudaSetDevice(device);
+    }
+    break;
+
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);

@@ -1125,3 +1125,69 @@ cudaGetDeviceCount(int* count)
 
   return ret_val;
 }
+
+EXTERNC cudaError_t
+cudaGetDeviceProperties(cudaDeviceProp* prop, int device)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaGetDeviceProperties;
+  strce_to_send.syscall_type.cuda_getDeviceProperties.device = device;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  // prop is an "out" parameter.
+  *prop = rcvd_strce.syscall_type.cuda_getDeviceProperties.prop;
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaMemset(void* devPtr, int  value, size_t count)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaMemset;
+  strce_to_send.syscall_type.cuda_memset.devPtr = devPtr;
+  strce_to_send.syscall_type.cuda_memset.value = value;
+  strce_to_send.syscall_type.cuda_memset.count = count;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
+EXTERNC cudaError_t
+cudaSetDevice (int device)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaSetDevice;
+  strce_to_send.syscall_type.cuda_setDevice.device = device;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
