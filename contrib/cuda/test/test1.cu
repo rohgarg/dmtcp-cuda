@@ -20,6 +20,6 @@ int main(int argc, char **argv)
 	cudaFree(cuda_c);
 
 	printf("%d + %d = %d\n", a, b, c);
-
+        sleep(10);
 	exit(EXIT_SUCCESS);
 }
