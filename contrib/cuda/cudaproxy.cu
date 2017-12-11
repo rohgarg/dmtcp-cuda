@@ -126,6 +126,8 @@ static int start_proxy(void)
       perror("read()");
       exit(EXIT_FAILURE);
     }
+    printf("Yeah there is interposition\n");
+    sleep(1);
     return_val = compute(skt_accept, &structure);
 
     // send the result

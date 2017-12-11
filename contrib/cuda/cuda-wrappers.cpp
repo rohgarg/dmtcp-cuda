@@ -1191,3 +1191,24 @@ cudaSetDevice (int device)
 
   return ret_val;
 }
+
+EXTERNC cudaError_t
+cudaMallocHost ( void** ptr, size_t size )
+{
+  // FIXME: need to be implemented later.
+  return cudaMalloc(ptr, size);
+}
+
+EXTERNC cudaError_t
+cudaMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, \
+cudaStream_t stream)
+{
+  // FIXME: need to be implemented later.
+  return cudaMemcpy(dst, src, count, kind);
+}
+
+EXTERNC cudaError_t
+cudaMemsetAsync(void* devPtr, int  value, size_t count, cudaStream_t stream)
+{
+  return cudaMemset(devPtr, value, count);
+}
