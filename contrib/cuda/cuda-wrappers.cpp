@@ -683,8 +683,10 @@ const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
   strce_to_send.op = CudaBindTexture;
   if (offset == NULL)
     strce_to_send.syscall_type.cuda_bind_texture.offset = 0;
-  else
-    strce_to_send.syscall_type.cuda_bind_texture.offset = *offset;
+  else{
+    // 1 to indicates that offset != NULL
+    strce_to_send.syscall_type.cuda_bind_texture.offset = 1;
+  }
   // a texture reference must be a global variable, hence
   // the pointer in the proxy process is valid as well.
   strce_to_send.syscall_type.cuda_bind_texture.texref = texref;
@@ -698,6 +700,8 @@ const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
   if (offset != NULL)
     *offset = (rcvd_strce.syscall_type).cuda_bind_texture.offset;
 
+  // needed for start
+  strce_to_send.syscall_type.cuda_bind_texture.offsetp = offset;
   log_append(strce_to_send);
 
   return ret_val;
