@@ -65,22 +65,55 @@ extern bool enableCudaCallLogging;
 enum cuda_syscalls
 {
   CudaMalloc,
+  CudaMallocPitch,
+  CudaMallocManaged,
+  CudaMallocManagedMemcpy,
   CudaFree,
   CudaMallocArray,
   CudaFreeArray,
-  CudaMallocManaged,
-  CudaMallocManagedMemcpy,
   CudaMemcpy,
   CudaHostAlloc,
   CudaConfigureCall,
   CudaSetupArgument,
   CudaLaunch,
-  CudaDeviceSync,
   CudaThreadSync,
   CudaGetLastError,
   CudaGetErrorString,
-  CudaMallocPitch
+  CudaMemcpy2D,
+  CudaDeviceReset,
+  CudaMemcpyToSymbol,
+  CudaCreateChannelDesc,
+  CudaBindTexture2D,
+  /*-- Added to support HPGMG-CUDA */
+  CudaBindTexture,
+  CudaCreateTextureObject,
+  CudaPeekAtLastError,
+  CudaProfilerStart,
+  CudaProfilerStop,
+  CudaStreamSynchronize,
+  CudaUnbindTexture,
+  CudaDestroyTextureObject,
+  CudaEventDestroy,
+  CudaEventQuery,
+  CudaFreeHost,
+  CudaDeviceCanAccessPeer,
+  CudaDeviceGetAttribute,
+  CudaDeviceSetCacheConfig,
+  CudaDeviceSetSharedMemConfig,
+  CudaDeviceSynchronize,
+  CudaEventCreateWithFlags,
+  CudaEventRecord,
+  CudaFuncGetAttributes,
+  CudaGetDevice,
+  CudaGetDeviceCount,
+  CudaGetDeviceProperties,
+  CudaMallocHost, // to be revisited
+  CudaMemcpyAsync, // to be revisited
+  CudaMemset,
+  CudaMemsetAsync, // to be revisited
+  CudaSetDevice // here
 };
+
 
 // the structure for all our cuda system calls
 // so far it's for the following functions
@@ -174,7 +207,8 @@ typedef struct
     struct
     {
       cudaError_t errorCode;
-      char *error_string; // to be used by the proxy.
+      // return value non-trivial (i.e. other than cudaError_t)
+      char *error_string;
       size_t size;
     } cuda_get_error_string;
 
@@ -182,12 +216,194 @@ typedef struct
     {
       // the structure takes a deferenced pointer
       // Since it's the proxy that calls cudaMallocPitch()
-      // &devPtr, (void **), will then be passed to cudaMallocPitch.
+      // &devPtr, (void *), will then be passed to cudaMallocPitch.
       void* devPtr;
-      size_t* pitch;
+      // original argument is "*pitch" but this makes information
+      // exchange between wrapper and proxy easier.
+      size_t pitch;
       size_t width;
       size_t height;
     } cuda_malloc_pitch;
+
+    struct
+     {
+       void * dst;
+       size_t dpitch;
+       const void * src;
+       size_t spitch;
+       size_t width;
+       size_t height;
+       enum cudaMemcpyKind kind;
+     } cuda_memcpy2_d;
+
+     struct
+     {
+       const void * symbol;
+       const void * src;
+       size_t count;
+       size_t offset;
+       enum cudaMemcpyKind kind;
+     } cuda_memcpy_to_symbol;
+
+     struct
+     {
+       int x;
+       int y;
+       int z;
+       int w;
+       enum cudaChannelFormatKind f;
+       // return value non-trivial (i.e. other than cudaError_t)
+       cudaChannelFormatDesc ret_val;
+     } cuda_create_channel_desc;
+
+     struct
+     {
+       // (*offset) is an "out" parameter. The value changes in the proxy.
+       // we chose "offset" instead of "*offset", it's easier to code this way.
+       size_t offset;
+       struct textureReference *texref;
+       const void  *devPtr;
+       // we chose "desc" instead of "*desc", it's easier to code this way.
+       struct cudaChannelFormatDesc desc;
+       size_t width;
+       size_t height;
+       size_t pitch;
+     } cuda_bind_texture2_d;
+
+     /* Added to support HPGMG-CUDA */
+     struct
+     {
+       size_t offset; // (*offset)
+       size_t *offsetp; // to be used on restart.
+       const textureReference *texref;
+       const void *devPtr;
+       struct cudaChannelFormatDesc desc; // (*desc)
+       size_t size;
+     } cuda_bind_texture;
+
+    struct
+    {
+      /* (* pTexObject) is an "out" parameter. */
+      cudaTextureObject_t pTexObject;
+      /* (* pResDesc) will be passed as pointer in the proxy*/
+      struct cudaResourceDesc pResDesc;
+      /* (* pTexDesc) will be passed as pointer in the proxy*/
+      struct cudaTextureDesc pTexDesc;
+      /* (*pResViewDesc) will be passed as pointer in the proxy*/
+      struct cudaResourceViewDesc pResViewDesc;
+    } cuda_create_texture_object;
+
+    struct
+    {
+      cudaTextureObject_t texObject;
+    }cuda_destroy_texture_object;
+
+    struct
+    {
+      cudaStream_t stream;
+    } cuda_stream_synchronize;
+
+    struct
+    {
+      cudaEvent_t event;
+    } cuda_event_destroy;
+
+    struct
+    {
+      const textureReference* texref;
+    } cuda_unbind_texture;
+
+    struct
+    {
+      cudaEvent_t event;
+    } cuda_event_query;
+
+    struct
+    {
+      void *ptr;
+    } cuda_free_host;
+
+    struct
+    {
+      int canAccessPeer; // int instead of (int *) \
+                            since the value changes in the proxy.
+      int device;
+      int peerDevice;
+    } cuda_device_can_access_peer;
+
+    struct
+    {
+      int value; // int instead of (int *) since the value changes in the proxy.
+      cudaDeviceAttr attr;
+      int device;
+    }cuda_device_get_attribute;
+
+    struct
+    {
+      cudaFuncCache cacheConfig;
+    } cuda_deviceSetCacheConfig;
+
+    struct
+    {
+      cudaSharedMemConfig config;
+    } cuda_deviceSetSharedMemConfig;
+
+    struct
+    {
+      cudaEvent_t event; // event instead of (event *) since
+                         // the value changes in the proxy.
+      unsigned int flags;
+    } cuda_eventCreateWithFlags;
+
+    struct
+    {
+      cudaEvent_t event;
+      cudaStream_t stream;
+    } cuda_eventRecord;
+
+    struct
+    {
+      cudaFuncAttributes attr; // attr instead of (* attr) since the value
+                               // changes in the proxy.
+      const void *func;
+    } cuda_funcGetAttributes;
+
+    struct
+    {
+      int device; // int instead of (int *) size the value changes in the proxy.
+    } cuda_getDevice;
+
+    struct
+    {
+      int count; // int instead of (int *) size the value changes in the proxy.
+    } cuda_getDeviceCount;
+
+    struct
+    {
+      cudaDeviceProp prop; // the value changes in the proxy.
+      int device;
+    } cuda_getDeviceProperties;
+
+    struct
+    {
+      void *dst;
+      const void *src;
+      size_t count;
+      cudaMemcpyKind kind;
+      cudaStream_t stream;
+    } cuda_memcpyAsync;
+
+    struct
+    {
+      void *devPtr;
+      int value;
+      size_t count;
+    } cuda_memset;
+
+    struct
+    {
+      int  device;
+    } cuda_setDevice;
   }syscall_type;
   const void *payload;
   size_t payload_size;

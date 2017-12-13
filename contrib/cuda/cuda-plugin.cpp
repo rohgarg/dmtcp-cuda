@@ -89,9 +89,21 @@ restart()
     if (rec.op == CudaMalloc) {
       cudaMalloc((void**)rec.syscall_type.cuda_malloc.pointer,
                  rec.syscall_type.cuda_malloc.size);
-    } else if (rec.op == CudaMallocManaged) {
+    }
+    else if (rec.op == CudaMallocManaged) {
       cudaMallocManaged((void**)rec.syscall_type.cuda_malloc.pointer,
                         rec.syscall_type.cuda_malloc.size);
+    }
+    else if (rec.op == CudaBindTexture) {
+      size_t *offset = rec.syscall_type.cuda_bind_texture.offsetp;
+      const textureReference *texref = \
+                       rec.syscall_type.cuda_bind_texture.texref;
+      const void *devPtr = rec.syscall_type.cuda_bind_texture.devPtr;
+      struct cudaChannelFormatDesc desc = \
+             rec.syscall_type.cuda_bind_texture.desc;
+      size_t size = rec.syscall_type.cuda_bind_texture.size;
+
+      cudaBindTexture(offset, texref, devPtr, &desc, size);
     }
     ret = log_read(&rec);
   }

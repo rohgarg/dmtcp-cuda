@@ -4,7 +4,7 @@
 
 __global__ void add(int a, int b, int *c)
 {
-	*c = a+b+10;
+	*c = a+b;
 }
 
 int main(int argc, char **argv)
@@ -14,12 +14,12 @@ int main(int argc, char **argv)
 	int *cuda_c = NULL;
 
 	cudaMalloc(&cuda_c, sizeof(int));
-        sleep(10);
 	add<<<1,1>>>(a, b, cuda_c);
+        sleep(10);
 	cudaMemcpy(&c, cuda_c, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaFree(cuda_c);
 
 	printf("%d + %d = %d\n", a, b, c);
-
+        sleep(10);
 	exit(EXIT_SUCCESS);
 }

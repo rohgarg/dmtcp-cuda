@@ -36,6 +36,8 @@ vi:
 cudaproxy: cudaproxy.cu
 	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -shared -o lib$@.so $< ../../src/libjalib.a -ldl
 
+# tests ---------------------------------------
+
 test1: test/test1.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
@@ -71,6 +73,17 @@ test7: test/test7.cu
 test7.1: test/test7.1.cu
 	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
+
+hpgmg: test/hpgmg.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
+
+
+
+# end: tests ------------------------------------------------
+
+
+
 
 run2.1: ${LIBNAME}.so cudaproxy test2.1
 	../../bin/dmtcp_launch -j  --with-plugin ./libdmtcp_cuda.so test/test2.1

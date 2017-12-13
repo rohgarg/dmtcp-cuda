@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include <cuda_profiler_api.h>
 
 #ifdef USE_SHM
 # include <sys/ipc.h>
@@ -20,6 +21,7 @@
 #include "trampolines.h"
 
 #define SKTNAME "proxy"
+#define specialCudaReturnValue  60000
 
 #ifndef EXTERNC
 # ifdef __cplusplus
@@ -169,7 +171,7 @@ int compute(int fd, cudaSyscallStructure *structure)
   switch (op)
   {
     //
-    case CudaDeviceSync:
+    case CudaDeviceSynchronize:
       return_val = cudaDeviceSynchronize();
       break;
 
@@ -186,6 +188,7 @@ int compute(int fd, cudaSyscallStructure *structure)
       cudaError_t errorCode = (cudaError_t)(structure->syscall_type).cuda_get_error_string.errorCode;
       char *error_string = (char *)cudaGetErrorString(errorCode);
       (structure->syscall_type).cuda_get_error_string.error_string = error_string;
+      (structure->syscall_type).cuda_get_error_string.size = strlen(error_string);
       return_val = cudaSuccess;
     }
       break;
@@ -197,15 +200,105 @@ int compute(int fd, cudaSyscallStructure *structure)
      }
      break;
 
+
     case CudaMallocPitch:
      {
-      void **devPtr = &((structure->syscall_type).cuda_malloc_pitch.devPtr);
-      size_t *pitch = (structure->syscall_type).cuda_malloc_pitch.pitch;
+      // void **devPtr = &((structure->syscall_type).cuda_malloc_pitch.devPtr);
+      // size_t *pitch = &((structure->syscall_type).cuda_malloc_pitch.pitch);
       size_t width = (structure->syscall_type).cuda_malloc_pitch.width;
       size_t height = (structure->syscall_type).cuda_malloc_pitch.height;
-      return_val =  cudaMallocPitch(devPtr, pitch, width, height);
+      return_val =  cudaMallocPitch(&((structure->syscall_type).cuda_malloc_pitch.devPtr), \
+                    &((structure->syscall_type).cuda_malloc_pitch.pitch), width, height);
      }
      break;
+
+    case CudaDeviceReset:
+    {
+      return_val = cudaDeviceReset();
+    }
+    break;
+
+    case CudaMemcpyToSymbol:
+    {
+      const void * symbol = (structure->syscall_type).cuda_memcpy_to_symbol.symbol;
+      const void * src = (structure->syscall_type).cuda_memcpy_to_symbol.src;
+      void *new_src;
+      size_t count = (structure->syscall_type).cuda_memcpy_to_symbol.count;
+      size_t offset = (structure->syscall_type).cuda_memcpy_to_symbol.offset;
+      enum cudaMemcpyKind kind = (structure->syscall_type).cuda_memcpy_to_symbol.kind;
+
+      if (kind == cudaMemcpyHostToDevice){
+        // read the payload.
+        new_src = malloc(count);
+        if (new_src == NULL){
+          perror("malloc()");
+          exit(EXIT_FAILURE);
+        }
+        if (read(fd, new_src, count) == -1){
+          perror("read()");
+          exit(EXIT_FAILURE);
+        }
+        return_val = cudaMemcpyToSymbol(symbol, new_src, count, offset, kind);
+      }
+      else if (kind == cudaMemcpyDeviceToDevice){
+        return_val = cudaMemcpyToSymbol(symbol, src, count, offset, kind);
+      }
+      else{
+        perror("bad direction value");
+        exit(EXIT_FAILURE);
+      }
+    }
+    break;
+
+
+    case CudaCreateChannelDesc:
+    {
+      int x = (structure->syscall_type).cuda_create_channel_desc.x;
+      int y = (structure->syscall_type).cuda_create_channel_desc.y;
+      int z = (structure->syscall_type).cuda_create_channel_desc.z;
+      int w = (structure->syscall_type).cuda_create_channel_desc.w;
+      enum cudaChannelFormatKind f = (structure->syscall_type).cuda_create_channel_desc.f;
+      (structure->syscall_type).cuda_create_channel_desc.ret_val = cudaCreateChannelDesc(x, y, z, w, f);
+
+      return_val = cudaSuccess;
+    }
+    break;
+
+
+    case CudaBindTexture2D:
+    {
+      // offset is an "out" parameter.
+      size_t offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
+      // size_t * offset = (structure->syscall_type).cuda_bind_texture2_d.offset;
+      struct textureReference *texref = (structure->syscall_type).cuda_bind_texture2_d.texref;
+      const void * devPtr = (structure->syscall_type).cuda_bind_texture2_d.devPtr;
+      const cudaChannelFormatDesc desc = (structure->syscall_type).cuda_bind_texture2_d.desc;
+      size_t width = (structure->syscall_type).cuda_bind_texture2_d.width;
+      size_t height = (structure->syscall_type).cuda_bind_texture2_d.height;
+      size_t pitch = (structure->syscall_type).cuda_bind_texture2_d.pitch;
+      if (offset == 0)
+        return_val = cudaBindTexture2D(NULL, texref, devPtr, &desc, width, height, pitch);
+      else
+        return_val = cudaBindTexture2D(&offset, texref, devPtr, &desc, width, height, pitch);
+        (structure->syscall_type).cuda_bind_texture2_d.offset = offset;
+    }
+    break;
+
+    case CudaBindTexture:
+    {
+      // offset is an "out" parameter.
+      size_t offset = (structure->syscall_type).cuda_bind_texture.offset;
+      const textureReference * texref = (structure->syscall_type).cuda_bind_texture.texref;
+      const void * devPtr = (structure->syscall_type).cuda_bind_texture.devPtr;
+      const cudaChannelFormatDesc desc = (structure->syscall_type).cuda_bind_texture.desc;
+      size_t size = (structure->syscall_type).cuda_bind_texture.size;
+      if (offset == 0)
+        return_val = cudaBindTexture(NULL, texref, devPtr, &desc, size);
+      else
+        return_val = cudaBindTexture(&offset, texref, devPtr, &desc, size);
+      (structure->syscall_type).cuda_bind_texture.offset = offset;
+    }
+    break;
 
     case CudaMallocManaged:
      {
@@ -313,6 +406,79 @@ int compute(int fd, cudaSyscallStructure *structure)
       }
       break;
 
+    case CudaMemcpy2D:
+    {
+      void *dst = (structure->syscall_type).cuda_memcpy2_d.dst;
+      void *new_dst;
+      size_t dpitch = (structure->syscall_type).cuda_memcpy2_d.dpitch;
+      const void *src =  (structure->syscall_type).cuda_memcpy2_d.src;
+      void *new_src;
+      size_t spitch =  (structure->syscall_type).cuda_memcpy2_d.spitch;
+      size_t width =  (structure->syscall_type).cuda_memcpy2_d.width;
+      size_t height =  (structure->syscall_type).cuda_memcpy2_d.height;
+      enum cudaMemcpyKind kind =  (structure->syscall_type).cuda_memcpy2_d.kind;
+
+      switch(kind)
+      {
+        case cudaMemcpyHostToDevice:
+          // receive payload
+          // we need a new memory space for source
+          new_src = malloc(spitch * height);
+          if (new_src == NULL)
+          {
+            printf("malloc() failed\n");
+            exit(EXIT_FAILURE);
+          }
+
+          if (read(fd, new_src, spitch * height) == -1)
+          {
+            perror("read()");
+            exit(EXIT_FAILURE);
+          }
+
+          // GPU computation
+          return_val = cudaMemcpy2D(dst, dpitch, new_src, spitch, width, height, kind);
+
+          free(new_src);
+          break;
+
+
+        case cudaMemcpyDeviceToHost:
+          // we need a new pointer for destination
+          new_dst = malloc(dpitch * height);
+          if (new_destination == NULL)
+          {
+            printf("malloc() failed\n");
+            exit(EXIT_FAILURE);
+          }
+
+          // GPU computation
+          return_val = cudaMemcpy2D(new_dst, dpitch, src, spitch, width, height, kind);
+
+          // send data to the master
+          if (write(fd, new_dst, (dpitch * height)) == -1)
+          {
+            perror("write()");
+            exit(EXIT_FAILURE);
+          }
+
+          free(new_dst);
+          break;
+
+        case cudaMemcpyDeviceToDevice:
+          // GPU computation
+          return_val = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
+          break;
+
+        default:
+          printf("bad direction value: %d\n", direction);
+          exit(EXIT_FAILURE);
+
+      }
+    }
+    break;
+
+
     case CudaMallocArray:
       return_val = cudaMallocArray(&((structure->syscall_type).cuda_malloc_array.array),
                        &((structure->syscall_type).cuda_malloc_array.desc),
@@ -373,10 +539,184 @@ int compute(int fd, cudaSyscallStructure *structure)
      }
      break;
 
+    case CudaPeekAtLastError:
+    {
+      return_val = cudaPeekAtLastError();
+    }
+    break;
+
+    case CudaProfilerStart:
+    {
+      return_val = cudaProfilerStart();
+    }
+    break;
+
+    case CudaProfilerStop:
+    {
+      return_val = cudaProfilerStop();
+    }
+    break;
+
+    case CudaStreamSynchronize:
+    {
+      cudaStream_t stream;
+      stream = (structure->syscall_type).cuda_stream_synchronize.stream;
+      return_val = cudaStreamSynchronize(stream);
+    }
+    break;
+
+    case CudaUnbindTexture:
+    {
+      const textureReference* texref;
+      texref = (structure->syscall_type).cuda_unbind_texture.texref;
+      return_val = cudaUnbindTexture(texref);
+    }
+    break;
+
+
+    case CudaCreateTextureObject:
+     {
+       cudaTextureObject_t pTexObject;
+       struct cudaResourceDesc pResDesc = (structure->syscall_type).cuda_create_texture_object.pResDesc;
+       struct cudaTextureDesc pTexDesc = (structure->syscall_type).cuda_create_texture_object.pTexDesc;
+       struct cudaResourceViewDesc pResViewDesc = (structure->syscall_type).cuda_create_texture_object.pResViewDesc;
+       return_val = cudaCreateTextureObject(&pTexObject, &pResDesc, &pTexDesc, &pResViewDesc);
+       // pTextObject is an "out" parameter
+       structure->syscall_type.cuda_create_texture_object.pTexObject = pTexObject;
+     }
+     break;
+
+     case CudaDestroyTextureObject:
+     {
+       return_val = cudaDestroyTextureObject((structure->syscall_type).cuda_destroy_texture_object.texObject);
+     }
+     break;
+
+     case CudaEventDestroy:
+     {
+       return_val = cudaEventDestroy((structure->syscall_type).cuda_event_destroy.event);
+     }
+     break;
+
+     case CudaEventQuery:
+     {
+       return_val = cudaEventQuery((structure->syscall_type).cuda_event_query.event);
+     }
+     break;
+
+    case CudaFreeHost:
+    {
+      return_val = cudaFreeHost((structure->syscall_type).cuda_free_host.ptr);
+    }
+    break;
+
+    case CudaDeviceCanAccessPeer:
+    {
+      int canAccessPeer;
+      int device = (structure->syscall_type).cuda_device_can_access_peer.device;
+      int peerDevice = (structure->syscall_type).cuda_device_can_access_peer.peerDevice;
+      return_val = cudaDeviceCanAccessPeer (&canAccessPeer, device, peerDevice);
+      (structure->syscall_type).cuda_device_can_access_peer.canAccessPeer = canAccessPeer;
+    }
+    break;
+
+    case CudaDeviceGetAttribute:
+    {
+      int value;
+      cudaDeviceAttr attr = (structure->syscall_type).cuda_device_get_attribute.attr;
+      int device = (structure->syscall_type).cuda_device_get_attribute.device;
+      return_val = cudaDeviceGetAttribute(&value, attr, device);
+      (structure->syscall_type).cuda_device_get_attribute.value = value;
+    }
+    break;
+
+    case CudaDeviceSetCacheConfig:
+    {
+      cudaFuncCache cacheConfig = (structure->syscall_type).cuda_deviceSetCacheConfig.cacheConfig;
+      return_val = cudaDeviceSetCacheConfig(cacheConfig);
+    }
+    break;
+
+    case CudaDeviceSetSharedMemConfig:
+    {
+      cudaSharedMemConfig config = (structure->syscall_type).cuda_deviceSetSharedMemConfig.config;
+      return_val = cudaDeviceSetSharedMemConfig(config);
+    }
+    break;
+
+    case CudaEventCreateWithFlags:
+    {
+      cudaEvent_t event;
+      unsigned int flags = (structure->syscall_type).cuda_eventCreateWithFlags.flags;
+      return_val = cudaEventCreateWithFlags(&event, flags);
+      (structure->syscall_type).cuda_eventCreateWithFlags.event = event;
+    }
+    break;
+
+    case CudaEventRecord:
+    {
+      cudaEvent_t event = (structure->syscall_type).cuda_eventRecord.event;
+      cudaStream_t stream = (structure->syscall_type).cuda_eventRecord.stream;
+
+      return_val = cudaEventRecord(event, stream);
+    }
+    break;
+
+    case CudaFuncGetAttributes:
+    {
+      cudaFuncAttributes attr;
+      const void *func = (structure->syscall_type).cuda_funcGetAttributes.func;
+      return_val = cudaFuncGetAttributes(&attr, func);
+      (structure->syscall_type).cuda_funcGetAttributes.attr = attr;
+    }
+    break;
+
+    case CudaGetDevice:
+    {
+      int device;
+      return_val = cudaGetDevice(&device);
+      (structure->syscall_type).cuda_getDevice.device = device;
+    }
+    break;
+
+    case CudaGetDeviceCount:
+    {
+      int count;
+      return_val = cudaGetDeviceCount(&count);
+      (structure->syscall_type).cuda_getDeviceCount.count = count;
+    }
+    break;
+
+    case CudaGetDeviceProperties:
+    {
+      cudaDeviceProp prop;
+      int device = (structure->syscall_type).cuda_getDeviceProperties.device;
+      return_val = cudaGetDeviceProperties(&prop, device);
+      (structure->syscall_type).cuda_getDeviceProperties.prop = prop;
+    }
+    break;
+
+    case CudaMemset:
+    {
+      void *devPtr = (structure->syscall_type).cuda_memset.devPtr;
+      int value = (structure->syscall_type).cuda_memset.value;
+      size_t count = (structure->syscall_type).cuda_memset.count;
+      return_val = cudaMemset(devPtr, value, count);
+    }
+    break;
+
+    case CudaSetDevice:
+    {
+      int device = (structure->syscall_type).cuda_setDevice.device;
+      return_val = cudaSetDevice(device);
+    }
+    break;
+
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);
 
   }
+
   return return_val;
 }

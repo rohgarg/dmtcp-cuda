@@ -130,9 +130,11 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
 
   // receive the result
   JASSERT(read(fd, ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
+
+
   if (strce_to_send->op != CudaGetLastError){
-    JASSERT((*ret_val) == cudaSuccess)
-           (cudaGetErrorString(*ret_val)).Text("CUDA syscall failed");
+    JASSERT((*(cudaError_t*)ret_val) == cudaSuccess)
+       (cudaGetErrorString(*(cudaError_t*)ret_val)).Text("CUDA syscall failed");
   }
 
   // get the structure back
@@ -140,15 +142,19 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
   JASSERT(read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) != -1)
          (JASSERT_ERRNO);
 
-  // "cudaGetErrorString" is a special case, its return type
-  // is "const char *."
-  if (rcvd_strce->op == CudaGetErrorString)
+  switch(rcvd_strce->op)
   {
-    size_t size = (rcvd_strce->syscall_type).cuda_get_error_string.size;
-    char *error_string = (char *) malloc(size * sizeof(char));
-    JASSERT(read(fd, error_string, size) != -1) (JASSERT_ERRNO);
-    (rcvd_strce->syscall_type).cuda_get_error_string.error_string \
-     = error_string;
+    case CudaGetErrorString:
+    {
+      // "cudaGetErrorString" is a special case, its return type
+      // is "const char *".
+      size_t size = (rcvd_strce->syscall_type).cuda_get_error_string.size;
+      char *error_string = (char *) malloc(size * sizeof(char));
+      JASSERT(read(fd, error_string, size) != -1) (JASSERT_ERRNO);
+      (rcvd_strce->syscall_type).cuda_get_error_string.error_string \
+       = error_string;
+    }
+    break;
   }
 }
 
