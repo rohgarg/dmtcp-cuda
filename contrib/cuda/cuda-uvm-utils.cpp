@@ -66,31 +66,33 @@ allShadowRegions()
 static bool
 sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 {
-  cudaSyscallStructure strce_to_send;
+  cudaSyscallStructure strce_to_send, rcvd_strce;
 
   memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
 
   strce_to_send.op = CudaMallocManagedMemcpy;
   strce_to_send.syscall_type.cuda_memcpy.destination = remotePtr;
   strce_to_send.syscall_type.cuda_memcpy.source = localPtr;
   strce_to_send.syscall_type.cuda_memcpy.size = size;
   strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyHostToDevice;
+  strce_to_send.payload = localPtr;
+  strce_to_send.payload_size = size;
 
   // send the structure
-  JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
-         (JASSERT_ERRNO);
-
-  // send the payload: part of the GPU computation actually
-  // XXX: We send a page at a time
-  JASSERT(write(skt_master, localPtr, size) != -1)(JASSERT_ERRNO);
+  cudaError_t ret_val;
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  JASSERT(ret_val == cudaSuccess)(ret_val)
+          .Text("Failed to send UVM dirty pages");
 }
 
 static bool
 receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 {
-  cudaSyscallStructure strce_to_send;
+  cudaSyscallStructure strce_to_send, rcvd_strce;
 
   memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
 
   strce_to_send.op = CudaMallocManagedMemcpy;
   strce_to_send.syscall_type.cuda_memcpy.destination = localPtr;
@@ -106,6 +108,14 @@ receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
   // XXX: We read a page at a time
   JASSERT(dmtcp::Util::readAll(skt_master, localPtr, size) == size)
          (JASSERT_ERRNO);
+
+  // TODO: Verify the return val
+  cudaError_t ret_val;
+  JASSERT(read(skt_master, &ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
+  JASSERT(ret_val == cudaSuccess)(ret_val)
+          .Text("Failed to receive UVM data");
+  JASSERT(read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) != -1)
+          (JASSERT_ERRNO);
 }
 
 static void
