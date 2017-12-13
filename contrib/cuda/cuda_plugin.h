@@ -274,6 +274,7 @@ typedef struct
      struct
      {
        size_t offset; // (*offset)
+       size_t *offsetp; // to be used on restart.
        const textureReference *texref;
        const void *devPtr;
        struct cudaChannelFormatDesc desc; // (*desc)
