@@ -543,7 +543,13 @@ cudaMallocPitch(void** devPtr, size_t* pitch, size_t width, size_t height)
   *devPtr = rcvd_strce.syscall_type.cuda_malloc_pitch.devPtr;
   *pitch = rcvd_strce.syscall_type.cuda_malloc_pitch.pitch;
 
+  // useful for restart.
+  strce_to_send.syscall_type.cuda_malloc_pitch.devPtr = devPtr;
+  strce_to_send.syscall_type.cuda_malloc_pitch.pitchp = pitch;
   log_append(strce_to_send); // FIXME: Not sure it is sufficient for restart.
+
+  MallocRegion r =  {.addr = *devPtr, .host_addr = NULL, .len = width*height};
+  allMallocRegions().push_back(r);
 
   return ret_val;
 }
@@ -727,7 +733,9 @@ EXTERNC cudaError_t cudaCreateTextureObject (cudaTextureObject_t * pTexObject, \
   send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
   *pTexObject = rcvd_strce.syscall_type.cuda_create_texture_object.pTexObject;
-
+  // will be useful on restart.
+  strce_to_send.syscall_type.cuda_create_texture_object.\
+                                            pTexObjectp = pTexObject;
   log_append(strce_to_send);
 
   return ret_val;
