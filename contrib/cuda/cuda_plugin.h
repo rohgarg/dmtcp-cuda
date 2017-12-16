@@ -221,6 +221,7 @@ typedef struct
       // original argument is "*pitch" but this makes information
       // exchange between wrapper and proxy easier.
       size_t pitch;
+      size_t *pitchp;
       size_t width;
       size_t height;
     } cuda_malloc_pitch;
@@ -285,6 +286,7 @@ typedef struct
     {
       /* (* pTexObject) is an "out" parameter. */
       cudaTextureObject_t pTexObject;
+      cudaTextureObject_t *pTexObjectp; // useful on restart.
       /* (* pResDesc) will be passed as pointer in the proxy*/
       struct cudaResourceDesc pResDesc;
       /* (* pTexDesc) will be passed as pointer in the proxy*/
