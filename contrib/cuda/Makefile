@@ -42,6 +42,10 @@ test1: test/test1.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
+test_1: test/test_1.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
+
 test2: test/test2.cu
 	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
@@ -119,7 +123,7 @@ tidy:
 
 clean:
 	rm -f ${LIBOBJS} ${LIBNAME}.so test2 test/test2.1 cudaproxy cudaSysCallsLog
-	rm -f test/test1 test/test2 test/test3 test/test4 test/test5 test/test5 test/test6 test/test7
+	rm -f test/test_1 test/test1 test/test2 test/test3 test/test4 test/test5 test/test5 test/test6 test/test7
 	rm -f libcudaproxy.so
 
 distclean: clean
