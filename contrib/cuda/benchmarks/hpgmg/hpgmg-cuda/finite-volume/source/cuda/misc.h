@@ -219,7 +219,7 @@ __global__ void reduction_kernel(level_type level, int id, double *res)
   switch (red_type) {
   case 0:
     block_val = BlockReduceT(temp_storage).Sum(thread_val);
-    if (threadIdx.x == 0) atomicAdd(res, block_val);
+    if (threadIdx.x == 0) atomicAdd((int*)res, (int)block_val);
     break;
   case 1:
     block_val = BlockReduceT(temp_storage).Reduce(thread_val, cub::Max());
