@@ -1,4 +1,3 @@
-  983  salloc -N 1 --exclusive -p par-gpu-2
   984  vi .bashrc 
 Add:
 USE: bashrc.patch
@@ -6,14 +5,14 @@ module load python-2.7.5
 module load slurm-14.11.8
 module load cuda-6.0
 module load mpich-3.0.4
-# for libquadmath.so :
-# module load gnu-4.8.1-compilers
-# DMTCP contrib/cuda is requiring g++-5.x ; Why?  Let's fix DMTCP. 
-module load gnu-5.2.1-OpenACC_2.0-Cuda7.0
+# for libquadmath.so (NOTE: CUDA6 on Discovery not supporting gnu-4.9 or higher)
+module load gnu-4.8.1-compilers
 NOTE: HPGMG works with MPICH, but not Open MPI
   985  source .bashrc 
-  986  git clone https://bitbucket.org/nsakharnykh/hpgmg-cuda.git
-  987  cd hpgmg-cuda/
+  986  salloc -N 1 --exclusive -p par-gpu-2
+  987  ssh `scontrol show hostname`
+  988  git clone https://bitbucket.org/nsakharnykh/hpgmg-cuda.git
+  989  cd hpgmg-cuda/
 USE:  misc.h.patch
 USE:  level.c.patch
  1014  vi build.sh
