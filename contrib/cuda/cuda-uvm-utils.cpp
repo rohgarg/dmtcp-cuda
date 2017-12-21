@@ -189,17 +189,25 @@ fault_handler_thread(void *arg)
 
     void *faultingPage = getAlignedAddress(msg.arg.pagefault.address,
                                            page_size);
+#if 0
     if (shadowPageMap().find(faultingPage) == shadowPageMap().end()) {
       JASSERT(false)(faultingPage)(msg.arg.pagefault.address)
              .Text("No UVM page found for faulting address");
     } else {
+#endif
       if (msg.arg.pagefault.flags & UFFD_PAGEFAULT_FLAG_WRITE) {
         // We mark the region as dirty for flushing at a later sync point
         markDirtyRegion(faultingPage);
       } else {
+#if 0
         receiveDataFromProxy(shadowPageMap()[faultingPage], page, page_size);
+#else
+        receiveDataFromProxy(faultingPage, page, page_size);
+#endif
       }
+#if 0
     }
+#endif
     fault_cnt++;
 
     uffdio_copy.src = (unsigned long) page;
@@ -227,16 +235,20 @@ monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
   uffdio_register.range.len = size;
   uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
 
-  JTRACE("register region")(addr)(size);
+  JNOTE("register region")(addr)(size);
 
   JASSERT(ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) != -1)(JASSERT_ERRNO);
 
   if (remoteInfo) {
     // Save the location and size of the shadow region
-    ShadowRegion r =  {.addr = addr, .len = size, .dirty = false};
-    allShadowRegions().push_back(r);
-    // Save the actual UVM region on the proxy
-    shadowPageMap()[addr] = remoteInfo->syscall_type.cuda_malloc.pointer;
+    for (int i = 0; i < size / page_size; i++) {
+      ShadowRegion r =  {.addr = addr + i * page_size,
+                         .len = size, .dirty = false};
+      allShadowRegions().push_back(r);
+      // Save the actual UVM region on the proxy
+      shadowPageMap()[addr] = remoteInfo->syscall_type.cuda_malloc.pointer +
+                              i * page_size;
+    }
   }
 }
 
