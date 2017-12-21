@@ -12,6 +12,12 @@ LIBOBJS = cuda-plugin.o cuda-wrappers.o cuda-common-utils.o cuda-uvm-utils.o cud
 CC=nvcc
 CXX=nvcc
 
+# NVCC_CC=/usr/bin/gcc-5
+# NVCC_CXX=/usr/bin/g++-5
+# *************** Make sure 'gcc --version' is 5.x, etc. for g++
+NVCC_CC=gcc
+NVCC_CXX=g++
+
 # Modify if your DMTCP_ROOT is located elsewhere.
 ifndef DMTCP_ROOT
   DMTCP_ROOT=../..
@@ -19,8 +25,11 @@ endif
 DMTCP_INCLUDE=${DMTCP_ROOT}/include
 JALIB_INCLUDE=${DMTCP_ROOT}/jalib/
 
-CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/gcc-5 -Xcompiler -fPIC -c -g -O0
-CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/g++-5 -Xcompiler -fPIC -c -g -O0 -cudart shared
+# Probably we need exactly g++ version 5.x because the nvcc being used is a wrapper for g++ version 5
+# CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
+# CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/g++-5 -Xcompiler -fPIC -c -g -O0 -cudart shared
+CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
+CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CXX} -Xcompiler -fPIC -c -g -O0 -cudart shared
 
 # enable this for debugging the plugin
 # CFLAGS += -DCUDA_PLUGIN_DEBUG
@@ -34,52 +43,52 @@ vi:
 	vim cuda-plugin.cpp
 
 cudaproxy: cudaproxy.cu
-	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -shared -o lib$@.so $< ../../src/libjalib.a -ldl
+	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -std c++11 -ccbin ${NVCC_CXX} -shared -o lib$@.so $< ../../src/libjalib.a -ldl
 
 # tests ---------------------------------------
 
 test1: test/test1.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test_1: test/test_1.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test2: test/test2.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test2.1: test/test2.1.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test3: test/test3.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test4: test/test4.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test5: test/test5.cu
-	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test6: test/test6.cu
-	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test7: test/test7.cu
-	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 test7.1: test/test7.1.cu
-	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -arch sm_30 -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 hpgmg: test/hpgmg.cu
-	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin /usr/bin/g++-5 -c -o $@.o $@.cu
+	cd test; nvcc -cudart shared -g -O0 -std c++11 -ccbin ${NVCC_CXX} -c -o $@.o $@.cu
 	cd test; g++ -L/usr/local/cuda-7.5/targets/x86_64-linux/lib/ -export-dynamic -o $@ $@.o -lcudart
 
 
