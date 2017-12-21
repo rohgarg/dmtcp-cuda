@@ -1,8 +1,8 @@
-*** .bashrc.orig	2017-12-20 17:29:58.956608830 -0500
---- .bashrc	2017-12-20 20:15:43.689699543 -0500
+*** /home/g.cooperman/.bashrc.orig	2017-12-20 17:29:58.956608830 -0500
+--- /home/g.cooperman/.bashrc	2017-12-21 00:38:53.909153442 -0500
 ***************
 *** 7,9 ****
---- 7,31 ----
+--- 7,33 ----
   
   
   # User specific aliases and functions
@@ -23,8 +23,10 @@
 + module load cuda-6.0
 + module load mpich-3.0.4
 + # for libquadmath.so :
-+ #module load gnu-4.8.1-compilers
++ # /shared/apps/cuda6.0/include/host_config.h says GNU 4.9 and higher not supp.
++ module load gnu-4.8.1-compilers
 + # for compiling DMTCP contrib/cuda plugin (why??)
 + # and for libquadmath.so :
-+ module load gnu-5.2.1-OpenACC_2.0-Cuda7.0
++ # /shared/apps/cuda6.0/include/host_config.h says GNU 4.9 and higher not supp.
++ # module load gnu-5.2.1-OpenACC_2.0-Cuda7.0
 + 

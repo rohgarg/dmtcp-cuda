@@ -17,6 +17,9 @@ CXX=nvcc
 # *************** Make sure 'gcc --version' is 5.x, etc. for g++
 NVCC_CC=gcc
 NVCC_CXX=g++
+# For Discovery:
+NVCC_CC=/shared/apps/gnu-compilers/gnu-5/install/bin/gcc
+NVCC_CXX=/shared/apps/gnu-compilers/gnu-5/install/bin/g++
 
 # Modify if your DMTCP_ROOT is located elsewhere.
 ifndef DMTCP_ROOT
@@ -24,6 +27,12 @@ ifndef DMTCP_ROOT
 endif
 DMTCP_INCLUDE=${DMTCP_ROOT}/include
 JALIB_INCLUDE=${DMTCP_ROOT}/jalib/
+
+
+# **********************************************************
+# Avoid warning: nvcc warning : The 'compute_10', and 'sm_10' architectures are deprecated, and may be removed in a future release
+CXXFLAGS += -arch sm_30
+# **********************************************************
 
 # Probably we need exactly g++ version 5.x because the nvcc being used is a wrapper for g++ version 5
 # CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
