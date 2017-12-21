@@ -6,7 +6,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#ifdef USERFAULTFD_DEFINED
 #include <linux/userfaultfd.h>
+#endif
 #include <pthread.h>
 #include <poll.h>
 #include <sys/mman.h>
@@ -22,14 +24,12 @@
 
 // Public global vars
 
-int ufd_initialized = False;
 int page_size = -1;
+int SHIFT = -1;
 
 bool haveDirtyPages = false;
 
 // Private global vars
-
-static int uffd = -1;
 
 struct ShadowRegion {
   void *addr;
@@ -39,9 +39,7 @@ struct ShadowRegion {
 
 // Private functions
 
-static void reregister_page(void *addr, size_t len);
-
-dmtcp::map<void*, void*>&
+static dmtcp::map<void*, void*>&
 shadowPageMap()
 {
   static dmtcp::map<void*, void*> *instance = NULL;
@@ -131,13 +129,55 @@ markDirtyRegion(void *page)
   }
 }
 
+void
+flushDirtyPages()
+{
+  if (!haveDirtyPages) return;
+
+  JTRACE("Flushing all dirty pages");
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    if (it->dirty) {
+      JTRACE("Send data to proxy")((void*)it->addr)(it->len);
+      sendDataToProxy(it->addr, it->addr, it->len);
+      // NOTE: We re-register the dirty page because UFFDIO_COPY
+      //       unregisters the page.
+#ifdef USERFAULTFD
+      reregister_page(it->addr, it->len);
+#endif
+      it->dirty = false;
+    }
+  }
+  haveDirtyPages = false;
+}
+
+/*
+ * Creates shadow pages that are monitored for reads and writes
+ * by the page fault handler.
+ */
+void*
+create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
+{
+  int npages = size / page_size + 1;
+  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
+  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+
+  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
+#ifdef USERFAULTFD
+  monitor_pages(addr, npages * page_size, remoteInfo);
+#endif
+  return addr;
+}
+
+#ifdef USERFAULTFD
 static void*
 fault_handler_thread(void *arg)
 {
   static struct uffd_msg msg;   /* Data read from userfaultfd */
   static int fault_cnt = 0;     /* Number of faults so far handled */
   long uffd;                    /* userfaultfd file descriptor */
-  static void *page = NULL;
+  static void *page_addr = NULL;
   struct uffdio_copy uffdio_copy;
   ssize_t nread;
 
@@ -266,26 +306,6 @@ reregister_page(void *addr, size_t len)
 // Public functions
 
 void
-flushDirtyPages()
-{
-  if (!haveDirtyPages) return;
-
-  JTRACE("Flushing all dirty pages");
-  dmtcp::vector<ShadowRegion>::iterator it;
-  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
-    if (it->dirty) {
-      JTRACE("Send data to proxy")((void*)it->addr)(it->len);
-      sendDataToProxy(it->addr, it->addr, it->len);
-      // NOTE: We re-register the dirty page because UFFDIO_COPY
-      //       unregisters the page.
-      reregister_page(it->addr, it->len);
-      it->dirty = false;
-    }
-  }
-  haveDirtyPages = false;
-}
-
-void
 unregister_all_pages()
 {
   struct uffdio_range uffdio_range;
@@ -316,6 +336,8 @@ register_all_pages()
     reregister_page(it->addr, it->len);
   }
 }
+
+int ufd_initialized = False;
 
 void
 userfaultfd_initialize(void)
@@ -381,20 +403,138 @@ reset_uffd(void)
 
   ufd_initialized = True;
 }
+#else
+/***********************************************************
+ * IMPORTANT:  This code makes the following assumptions.
+ * 0.  The shadow pages of the application process will be kept loosely
+ *     in sync with the managed memory pages of the proxy process.
+ *     The managed memory pages act as shared memory between host and device.
+ * 1.  The master (application process) is always in one of three states:
+ *       (a) reading from managed memory; (b) writing to managed memory;
+ *       (c) making a CUDA call
+ * 2.  We can interpose on a transition among any of the states.
+ * 2.a.  We can interpose on a transition to a CUDA call through our wrappers.
+ *       Upon entering the CUDA call state, we remove read and write
+ *       permission from all of the shadow pages in the application process.
+ * 2.b. We can interpose on a transition to a read state because our
+ *      segvfault_handler will note that the previous state is not "read".
+ *      If the previous state was "write", then we remove write permissions
+ *      from all shadow pages.
+ *      For each read of a page, we then grant read permission and return from
+ *      the handler.
+ * 2.c. We can interpose on a transition to a write state because our
+ *      segvfault_handler will note that the previous state is not "write".
+ *      If the previous state was "read", then we remove read permissions
+ *      from all shadow pages.
+ *      For each write to a page, we then grant write permission and return
+ *      from the handler.
+ * 3.  There are some obvious optimizations that we could experiment with.
+ *      For example, on transition to "read", we could grant read to all pages
+ *      if we "learn" that the application is likely to read from all pages.
+ *      Before this, we could copy all pages from proxy to application
+ *      (eager policy).
+ *      On transition to "write", we could grant write to all pages if we
+ *      "learn" that the application is likely to write from all pages.
+ *      We could defer copying from application to proxy until transitioning
+ *      away from the "write" state.
+ * 4.  There are some assumptions here.  In particular, we assume that
+ *      eager reading doesn't change the semantics.  But the application could
+ *      look at a read on a special page, in order to decide which page will
+ *      next be modified by the device.  So, eagerly reading from other
+ *      pages without waiting for the special page to be modifed would be
+ *      a mistake.
+ ***********************************************************/
 
-/*
- * Creates shadow pages that are monitored for reads and writes
- * by the page fault handler.
- */
-void*
-create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
+
+// # define _GNU_SOURCE
+# include <signal.h>
+
+int segvfault_initialized = False;
+void segvfault_handler(int, siginfo_t *, void *);
+
+void
+segvfault_initialize(void)
 {
-  int npages = size / page_size + 1;
-  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
-  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  if (segvfault_initialized) return;
 
-  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-  monitor_pages(addr, npages * page_size, remoteInfo);
-  return addr;
+  page_size = sysconf(_SC_PAGE_SIZE);
+  // We need SHIFT inside segvfault_handler()
+  for (SHIFT = 0; (1<<SHIFT) < page_size; SHIFT++) ;
+  JASSERT(1<<SHIFT == page_size);
+
+  // first install a PAGE FAULT handler: using sigaction
+  static struct sigaction action;
+  memset(&action, 0, sizeof(action));
+  action.sa_flags = SA_SIGINFO;
+  action.sa_sigaction = segvfault_handler;
+  sigemptyset(&action.sa_mask);
+
+  if (sigaction(SIGSEGV, &action, NULL) == -1){
+    perror("sigaction");
+    exit(1);
+  }
+
+  segvfault_initialized = True;
 }
+
+void segvfault_handler(int signum, siginfo_t *siginfo, void *context){
+  // get which address segfaulted 
+  void *addr = (void *) siginfo->si_addr;
+  if (addr == NULL){
+    perror("segvfault_handler");
+    exit(1);
+  }
+  void *page_addr = (void *)(((long long unsigned)addr >> SHIFT) << SHIFT);
+
+  // Find out if this is a write fault.  (Otherwise, it's a read fault.)
+  JASSERT(siginfo->si_code == SEGV_ACCERR);
+  // This may be Intel-specific.  It depends on REG_ERR.
+  int err = ((ucontext_t*)context)->uc_mcontext.gregs[REG_ERR];
+  // FIXME:  On StackOverflow, there seem to be contradictory answers
+  //   on whether we want the negation or not, below:
+  //   https://stackoverflow.com/questions/17671869/how-to-identify-read-or-write-operations-of-page-fault-when-using-sigaction-hand
+  bool is_write_fault = !(err & 0x2);
+
+// FIXME:  Add: enum application_state: READ, WRITE, CUDA_CALL.
+//   Then add logic:   if (is_write_fault && application_state != WRITE) ...;
+//   and so on.
+
+  // change the permission in the corresponding mem region.
+
+  // make sure the page is mapped.
+  int prot = PROT_NONE;
+// FIXME:
+//   For now, I am giving all permissions.  We need to examine
+//   the state ("read", "write", or "CUDA call"), and give permission
+//   only acccording to the required state.
+  int flags = MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS;  
+  if (mmap(addr, page_size, prot, flags, -1, 0) == (void *)-1) {
+    perror("mmap"); 
+    exit(1);
+  }
+// FIXME (see above)
+  if (mprotect(addr, page_size, PROT_WRITE|PROT_READ|PROT_EXEC) == -1){
+    perror("mprotect");
+    exit(1);
+  }
+
+//  if (write(skt_live_migrate, &addr, sizeof(addr)) == -1){
+//    perror("write");
+//    exit(1);
+//  }
+  //-- receive the page -- 
+  // read data in memory
+  JTRACE("    SEGV page fault: ")
+        (addr)(page_addr)(page_size);
+
+// FIXME:  Need to copy from UVM page to shadow page.  Change one of page_addr
+  // Copy second argument from proxy process into this application process
+  receiveDataFromProxy(page_addr, page_addr, page_size);
+//  if (read(skt_live_migrate, addr, page_size) == -1){
+//    perror("read");
+//    exit(1);
+//  }
+  // the execution continues where it segfaulted, it
+  // reexecutes the same instruction but it won't segfault this time.
+}
+#endif
