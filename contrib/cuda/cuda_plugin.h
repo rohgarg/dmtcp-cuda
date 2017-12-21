@@ -47,6 +47,7 @@
 
 extern int initialized;
 extern int ufd_initialized;
+extern int segvfault_initialized;
 extern void *shmaddr;
 extern int logFd;
 extern int page_size;
@@ -434,13 +435,15 @@ void enable_cuda_call_logging();
 bool should_log_cuda_calls();
 
 void userfaultfd_initialize(void);
+void segvfault_initialize(void);
 void reset_uffd(void);
 void* create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo = NULL);
 void unregister_all_pages();
 void register_all_pages();
 void flushDirtyPages();
 
-dmtcp::map<void*, void*>& shadowPageMap();
+// This is now static, scope within one file
+// dmtcp::map<void*, void*>& shadowPageMap();
 
 #endif // ifndef STANDALONE
 

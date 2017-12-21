@@ -17,8 +17,13 @@ cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
   if (!initialized)
     proxy_initialize();
 
+#ifdef USERFAULTFD_INITIALIZED
   if (!ufd_initialized)
     userfaultfd_initialize();
+#else
+  if (!segvfault_initialized)
+    segvfault_initialize();
+#endif
 
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
