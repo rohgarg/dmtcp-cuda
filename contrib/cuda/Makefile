@@ -18,8 +18,8 @@ CXX=nvcc
 NVCC_CC=gcc
 NVCC_CXX=g++
 # For Discovery:
-NVCC_CC=/shared/apps/gnu-compilers/gnu-5/install/bin/gcc
-NVCC_CXX=/shared/apps/gnu-compilers/gnu-5/install/bin/g++
+#NVCC_CC=/shared/apps/gnu-compilers/gnu-5/install/bin/gcc
+#NVCC_CXX=/shared/apps/gnu-compilers/gnu-5/install/bin/g++
 
 # Modify if your DMTCP_ROOT is located elsewhere.
 ifndef DMTCP_ROOT
@@ -52,7 +52,8 @@ vi:
 	vim cuda-plugin.cpp
 
 cudaproxy: cudaproxy.cu
-	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -std c++11 -ccbin ${NVCC_CXX} -shared -o lib$@.so $< ../../src/libjalib.a -ldl
+	# nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -std c++11 -ccbin ${NVCC_CXX} -shared -o lib$@.so $< ../../src/libjalib.a -ldl
+	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -shared -o lib$@.so $< ../../src/libjalib.a -ldl
 
 # tests ---------------------------------------
 
