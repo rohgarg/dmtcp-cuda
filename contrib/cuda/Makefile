@@ -14,12 +14,14 @@ CXX=nvcc
 
 # NVCC_CC=/usr/bin/gcc-5
 # NVCC_CXX=/usr/bin/g++-5
-# *************** Make sure 'gcc --version' is 5.x, etc. for g++
+# *************** Make sure 'gcc --version' is appropriate
+# READ FILE RESULTING FROM:
+#   PREFIX=`which nvcc` && echo `dirname $PREFIX`/../include/host_config.h
+#      (or similar file) and search for '#if defined(__GNUC__)'
+#      to see what GNU versions are supported by that CUDA.
+# Then check 'g++ --version' for compatibility
 NVCC_CC=gcc
 NVCC_CXX=g++
-# For Discovery:
-#NVCC_CC=/shared/apps/gnu-compilers/gnu-5/install/bin/gcc
-#NVCC_CXX=/shared/apps/gnu-compilers/gnu-5/install/bin/g++
 
 # Modify if your DMTCP_ROOT is located elsewhere.
 ifndef DMTCP_ROOT
