@@ -18,7 +18,8 @@ USE:  level.c.patch
  1014  vi build.sh
 USE:  build.sh.patch
  1015  make -j clean
- 1016  ./build.sh
+USE:  base.mk.patch
+ 1017  ./build.sh
 cat run.sh
 ./build/bin/hpgmg-fv 7 8
 
@@ -26,3 +27,11 @@ cat run.sh
 REPLACE WITH YOUR github NAME, BELOW
   (private repo, make sure Rohan included you.)
 git clone https://gc00@github.com/rohgarg/dmtcp-cuda.git
+
+=====
+DMTCP CUDA:
+
+  963  cd contrib/cuda
+  964  make clean && make && make cudaproxy
+  966  ../../bin/dmtcp_launch --with-plugin ./libdmtcp_cuda.so ~/hpgmg-cuda/build/bin/hpgmg-fv 7 8
+
