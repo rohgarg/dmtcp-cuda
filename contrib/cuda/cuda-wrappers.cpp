@@ -137,6 +137,33 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
   strce_to_send.syscall_type.cuda_memcpy.size = size;
   strce_to_send.syscall_type.cuda_memcpy.direction = direction;
 
+  // FIXME:  Implement 'memory_type(ptr)' to call proxy and return
+  //         either 'cudaMemoryYypeHost' or 'cudaMemoryYypeDevice'.
+  // SEE:  http://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__UNIFIED.html#group__CUDART__UNIFIED_1gd89830e17d399c064a2f3c3fa8bb4390
+  //     Possible code on proxy:
+  //     enum cudaMemoryType memory_type(const void* ptr) {
+  //       cudaPointerAttributes attributes;
+  //       cudaPointerGetAttributes(&attributes, ptr);
+  //       return attributes.memoryType;
+  //     }
+  if (direction == cudaMemcpyDefault) {
+    if (memory_type(pointer1) == cudaMemoryYypeHost &&
+        memory_type(pointer2) == cudaMemoryYypeHost) {
+      direction = cudaMemcpyHostToHost;
+    } else if (memory_type(pointer1) == cudaMemoryYypeHost &&
+               memory_type(pointer2) == cudaMemoryYypeDevice) {
+      direction = cudaMemcpyDeviceToHost;
+    } else if (memory_type(pointer1) == cudaMemoryYypeDevice &&
+               memory_type(pointer2) == cudaMemoryYypeHost) {
+      direction = cudaMemcpyHostToDevice;
+    } else if (memory_type(pointer1) == cudaMemoryYypeDevice &&
+               memory_type(pointer2) == cudaMemoryYypeDevice) {
+      direction = cudaMemcpyDeviceToDevice;
+    } else {
+      JASSERT(false).Text("DMTCP/CUDA internal error");
+    }
+  }
+
   switch(direction)
   {
     JTRACE("cudaMemcpy(): lib");
@@ -179,6 +206,10 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
       send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
 
       break;
+
+    case cudaMemcpyDefault:
+      JASSERT(false).
+        Text("DMTCP/CUDA internal error: cudaMemcpyDefault not translated");
 
     default:
       JASSERT(false)(direction).Text("Unknown direction for memcpy");
