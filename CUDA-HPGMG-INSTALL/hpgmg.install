@@ -33,7 +33,9 @@ git clone https://gc00@github.com/rohgarg/dmtcp-cuda.git
     (private repo, make sure Rohan included you.)
 # Maybe (until we merge this into 'master'):
 checkout gene-tmp
-cd dmtcp-cuda/contrib/cuda
+cd dmtcp-cuda
+./configure && make -j check-dmtcp1
+cd contrib/cuda
 make clean && make && make cudaproxy
 ../../bin/dmtcp_launch --with-plugin ./libdmtcp_cuda.so \
                        ~/hpgmg-cuda/build/bin/hpgmg-fv 7 8

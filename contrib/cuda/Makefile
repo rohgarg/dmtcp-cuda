@@ -36,7 +36,6 @@ JALIB_INCLUDE=${DMTCP_ROOT}/jalib/
 CXXFLAGS += -arch sm_30
 # **********************************************************
 
-# Probably we need exactly g++ version 5.x because the nvcc being used is a wrapper for g++ version 5
 # CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
 # CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/g++-5 -Xcompiler -fPIC -c -g -O0 -cudart shared
 CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
