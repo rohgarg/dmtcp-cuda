@@ -112,7 +112,8 @@ enum cuda_syscalls
   CudaMemcpyAsync, // to be revisited
   CudaMemset,
   CudaMemsetAsync, // to be revisited
-  CudaSetDevice // here
+  CudaSetDevice, // here
+  CudaPointerGetAttributes
 };
 
 
@@ -407,6 +408,12 @@ typedef struct
     {
       int  device;
     } cuda_setDevice;
+
+    struct
+    {
+      void *ptr;
+      cudaPointerAttributes attributes;
+    } cuda_pointer_get_attributes;
   }syscall_type;
   const void *payload;
   size_t payload_size;

@@ -712,6 +712,12 @@ int compute(int fd, cudaSyscallStructure *structure)
     }
     break;
 
+    case CudaPointerGetAttributes:
+    {
+      return_val = cudaPointerGetAttributes(&((structure->syscall_type).cuda_pointer_get_attributes.attributes), (structure->syscall_type).cuda_pointer_get_attributes.ptr);
+    }
+    break;
+
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);
