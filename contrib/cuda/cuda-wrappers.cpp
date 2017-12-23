@@ -117,6 +117,30 @@ cudaFree(void *pointer)
   return ret_val;
 }
 
+EXTERNC cudaError_t
+cudaPointerGetAttributes(cudaPointerAttributes *attributes, const void *ptr)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val = cudaSuccess;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaPointerGetAttributes;
+  strce_to_send.syscall_type.cuda_pointer_get_attributes.ptr = (void*)ptr;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  *attributes = rcvd_strce.syscall_type.cuda_pointer_get_attributes.attributes;
+
+  log_append(strce_to_send);
+
+  return ret_val;
+}
+
 // 3.
 EXTERNC cudaError_t
 cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
@@ -146,18 +170,26 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
   //       cudaPointerGetAttributes(&attributes, ptr);
   //       return attributes.memoryType;
   //     }
-  if (direction == cudaMemcpyDefault) {
-    if (memory_type(pointer1) == cudaMemoryYypeHost &&
-        memory_type(pointer2) == cudaMemoryYypeHost) {
+  if (direction == cudaMemcpyDefault)
+  {
+    cudaPointerAttributes pointer1Attr, pointer2Attr;
+
+    JASSERT(cudaPointerGetAttributes(&pointer1Attr, pointer1) == cudaSuccess)\
+                                     .Text("Error getting pointer properties");
+    JASSERT(cudaPointerGetAttributes(&pointer2Attr, pointer2) == cudaSuccess)\
+                                     .Text("Error getting pointer properties");
+
+    if (pointer1Attr.memoryType == cudaMemoryTypeHost &&
+        pointer2Attr.memoryType == cudaMemoryTypeHost) {
       direction = cudaMemcpyHostToHost;
-    } else if (memory_type(pointer1) == cudaMemoryYypeHost &&
-               memory_type(pointer2) == cudaMemoryYypeDevice) {
+    } else if (pointer1Attr.memoryType == cudaMemoryTypeHost &&
+               pointer2Attr.memoryType == cudaMemoryTypeDevice) {
       direction = cudaMemcpyDeviceToHost;
-    } else if (memory_type(pointer1) == cudaMemoryYypeDevice &&
-               memory_type(pointer2) == cudaMemoryYypeHost) {
+    } else if (pointer1Attr.memoryType == cudaMemoryTypeDevice &&
+               pointer2Attr.memoryType == cudaMemoryTypeHost) {
       direction = cudaMemcpyHostToDevice;
-    } else if (memory_type(pointer1) == cudaMemoryYypeDevice &&
-               memory_type(pointer2) == cudaMemoryYypeDevice) {
+    } else if (pointer1Attr.memoryType == cudaMemoryTypeDevice &&
+               pointer2Attr.memoryType == cudaMemoryTypeDevice) {
       direction = cudaMemcpyDeviceToDevice;
     } else {
       JASSERT(false).Text("DMTCP/CUDA internal error");
