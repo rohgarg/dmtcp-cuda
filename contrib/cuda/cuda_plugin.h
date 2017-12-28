@@ -113,7 +113,8 @@ enum cuda_syscalls
   CudaMemset,
   CudaMemsetAsync, // to be revisited
   CudaSetDevice, // here
-  CudaPointerGetAttributes
+  CudaPointerGetAttributes,
+  CudaOccupancyMaxActiveBlocksPerMultiprocessor
 };
 
 
@@ -414,6 +415,14 @@ typedef struct
       void *ptr;
       cudaPointerAttributes attributes;
     } cuda_pointer_get_attributes;
+
+    struct
+    {
+      int numBlocks;
+      const void* func;
+      int  blockSize;
+      size_t dynamicSMemSize;
+    } cuda_occupancy_max_active_blocks_per_multiprocessor;
   }syscall_type;
   const void *payload;
   size_t payload_size;

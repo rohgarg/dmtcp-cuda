@@ -718,6 +718,15 @@ int compute(int fd, cudaSyscallStructure *structure)
     }
     break;
 
+    case CudaOccupancyMaxActiveBlocksPerMultiprocessor:
+    {
+      return_val = cudaOccupancyMaxActiveBlocksPerMultiprocessor(&((structure->syscall_type).cuda_occupancy_max_active_blocks_per_multiprocessor.numBlocks), \
+		      (structure->syscall_type).cuda_occupancy_max_active_blocks_per_multiprocessor.func, \
+		      (structure->syscall_type).cuda_occupancy_max_active_blocks_per_multiprocessor.blockSize, \
+		      (structure->syscall_type).cuda_occupancy_max_active_blocks_per_multiprocessor.dynamicSMemSize);
+    }
+    break;
+
     default:
       printf("bad op value: %d\n", (int) op);
       exit(EXIT_FAILURE);
