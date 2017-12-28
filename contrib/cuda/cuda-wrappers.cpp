@@ -1275,15 +1275,50 @@ cudaMallocHost ( void** ptr, size_t size )
 }
 
 EXTERNC cudaError_t
-cudaMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, \
-cudaStream_t stream)
+cudaMemcpyAsync (void* dst, const void* src, size_t count, \
+        cudaMemcpyKind kind, cudaStream_t stream)
 {
   // FIXME: need to be implemented later.
   return cudaMemcpy(dst, src, count, kind);
 }
 
 EXTERNC cudaError_t
-cudaMemsetAsync(void* devPtr, int  value, size_t count, cudaStream_t stream)
+cudaMemsetAsync (void* devPtr, int  value, size_t count, cudaStream_t stream)
 {
   return cudaMemset(devPtr, value, count);
+}
+
+
+EXTERNC cudaError_t
+cudaOccupancyMaxActiveBlocksPerMultiprocessor (int *numBlocks, \
+           const void *func, int blockSize, size_t dynamicSMemSize)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaSyscallStructure strce_to_send, rcvd_strce;
+  cudaError_t ret_val;
+
+  memset(&strce_to_send, 0, sizeof(strce_to_send));
+  memset(&rcvd_strce, 0, sizeof(rcvd_strce));
+
+  strce_to_send.op = CudaOccupancyMaxActiveBlocksPerMultiprocessor;
+  strce_to_send.syscall_type.\
+      cuda_occupancy_max_active_blocks_per_multiprocessor.func = func;
+  strce_to_send.syscall_type.\
+      cuda_occupancy_max_active_blocks_per_multiprocessor.blockSize \
+        = blockSize;
+  strce_to_send.syscall_type.\
+      cuda_occupancy_max_active_blocks_per_multiprocessor.dynamicSMemSize \
+        = dynamicSMemSize;
+
+  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+
+  *numBlocks = rcvd_strce.\
+      syscall_type.cuda_occupancy_max_active_blocks_per_multiprocessor.\
+      numBlocks;
+
+  log_append(strce_to_send);
+
+  return ret_val;
 }
