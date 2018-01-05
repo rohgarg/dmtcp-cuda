@@ -198,8 +198,6 @@ cudaMemcpy(void *pointer1, const void *pointer2, size_t size,
 
   switch(direction)
   {
-    JTRACE("cudaMemcpy(): lib");
-
     case cudaMemcpyHostToHost:
     {
       memcpy(pointer1, pointer2, size);
@@ -283,8 +281,6 @@ cudaMemcpy2D(void *dst, size_t dpitch, const void *src, size_t spitch,
 
   switch(direction)
   {
-    JTRACE("cudaMemcpy(): lib");
-
     case cudaMemcpyHostToHost:
     {
       // height: number of rows
