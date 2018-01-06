@@ -1,0 +1,18 @@
+With this new version, we will auto-generate:
+  cuda_plugin.h cudaproxy.icu cudawrappers.icpp
+
+In short, 'make' in this directory creates those files by calling:
+  python cuda-wrappers.py main.template
+Hence, cuda-wrappers.py and main.template are the important inputs for
+auto-generation.
+
+They are auto-generated in this python-auto-generate subdirectory.
+We can then modify the main Makefile to copy those files into the plugin
+directory and integrate them appropriately.
+
+BUGS lists the current bugs to fix in the auto-generator.
+Please continue to update it.
+
+As of this writing, we still need to modify contrib/cuda2/Makefile
+to call this Makefile in contrib/cuda2/python-auto-generate, and
+then integrate those generated files with this code.

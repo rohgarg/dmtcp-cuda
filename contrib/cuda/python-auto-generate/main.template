@@ -1,0 +1,370 @@
+########################################################################
+# NOTE:  cudaMalloc() and cudaMallocHost() and cudaHostAlloc()
+#          and cudaMallocManaged() and cudaMalloc*()
+#          cudaFree() cudaFreeHost() must be hand-written as separate wrappers.
+#        In the future, we could add a keyword CUDA_WRAPPER_CUSTOM
+########################################################################
+
+########################################################################
+# NOTE:  Please read the "FIXME"'s in cuda-wrappers.py, and either
+#          verify that we don't need to implement that for now, or else
+#          implement it as needed.
+########################################################################
+
+########################################################################
+# NOTE:  To find type declarations, can look in /shared/apps/cuda6.0/include/*
+#          or similar., and grep for 'typedef'
+#        We need this information to decide if a type is a pointer, or a
+#        struct, or other.  Some types that we require for the declarations are:
+#   cudaError_t - [PRIM] int (enum)
+#   cudaStream_t - [PTR{ typedef CUstream_st * cudaStream_t
+#   cudaTextureObject_t - [PRIM} typedef unsigned long long cudaTextureObject_t
+#   cudaEvent_t - [PTR} typedef struct CUevent_st* cudaEvent_t
+########################################################################
+
+# Optional tags for each argument in a function signature:
+# (In cuda-wrappers.py, this is stored as the value of the "inout" key.)
+#
+# :IN - in parameter (copy-by-value); This is the default if no tag present.
+#       The application process passes this to the proxy process.
+# :OUT - out parameter; Argument is pointer different from "char *" and "void *"
+#       The proxy process writes to a local variable pointed to by arg.
+#       The value of the local variable is passed back to the
+#         application process, and written to "arg *"
+#       EXAMPLE:  int stat(const char *path, :OUT struct stat *buf);
+#
+# :DEST, :SRC, :SIZE - :DEST, :SRC are bufs of type "char *" or "void *"
+#       :SIZE is of type "size_t" or "int" or "unsigned int"
+#       :SRC buf of size :SIZE is copied from application process to proxy
+#       :DEST buf of size :SIZE is copied from proxy to application process
+#          [A possible other name for (:SRC, :DEST) is (:IN_BUF, :OUT_BUF)]
+#       EXAMPLE:  void *memcpy(:DEST void *dest, :SRC const void *src,
+#                              :SIZE size_t n);
+# :DIRECTION - used with :DEST, :SRC, :SIZE
+#       Similar to above, but value of "direction" argument at runtime
+#       determines whether source and dest reside on host (application procss)
+#         or must be transferred to device (to proxy process).
+#       EXAMPLE:  cudaError_t cudaMemcpy(:DEST void * dst,
+#		                :SRC const void * src, :SIZE size_t count,
+#		                :DIRECTION enum cudaMemcpyKind kind) 	
+#        
+# TODO:
+# cudaBindTexture2D - offset arg is :OUT_OPT because the ptr
+#       might be NULL on input
+# 	(meaning the output will not be set)
+# 	:IN_DEEPCOPY should copy "sizeof *arg" for "mytype_t *arg"
+#       EXAMPLE:  int pthread_join(pthread_t thread, :OUT_OPT void **value_ptr);
+# 	EXAMPLE: int cudaBindTexture2D(:OUT_OPT size_t *offset,
+#              	   :IN_DEEPCOPY const struct textureReference *texref,
+#		   const void *devPtr,
+#		   :IN_DEEPCOPY const struct cudaChannelFormatDesc *desc,
+#		   size_t width, size_t height, size_t pitch) 	
+# :IN_DEEPCOPY -
+#  EXAMPLE:  :IN_DEEPCOPY mytype_t * arg ; Must copy: sizeof mytype_t
+#  EXAMPLE:  int pthread_create(:OUT pthread_t *thread,
+#                               :IN_DEEPCOPY const pthread_attr_t *attr,
+#
+#                               :IN void *(*start_routine) (void *),
+#                               :IN void *arg);
+#            where the last two ":IN" tags won't work between processes.
+#
+#  cudaMalloc() and cudaMallocHost() and cudaHostAlloc()
+#    and cudaMallocManaged() and cudaMalloc*() and
+#    cudaFree() and cudaFreeHost and cudaFreeAray
+# 
+# Another potential tag is :INOUT - pointer points to base memmory,
+#       and the memory is valid on input, and replaced on output
+#   We must re-use the input memory on output
+# EXAMPLE: cudaGetDeviceProperties(:INOUT cudaDeviceProp* prop, int device)
+# 
+# CUDA_VERBATIM_WRAPPER(...) -- inserts code directly into cudawrapper.icc
+#   For technical reasons, comments in the code are not currently preserved.
+#                               
+# CUDA_VERBATIM_PROXY(...) -- inserts code directly into cudaproxy.icc
+#   For technical reasons, comments in the code are not currently preserved.
+
+########################################################################
+# These signatures are taken from the github repo, from cuda-wrappers.cpp
+########################################################################
+
+CUDA_WRAPPER(
+anyType cudaTest()
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMalloc(:OUT void **pointer, size_t size)
+)
+
+## FIXME: This may need custom handling if pointer points to memory
+#    in proxy on host
+#EXTERNC cudaError_t
+#cudaFree(void *pointer)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaPointerGetAttributes(:OUT cudaPointerAttributes *attributes,
+                         const void *ptr)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemcpy(:DEST void *pointer1, :SRC const void *pointer2, :SIZE size_t size,
+           :DIRECTION enum cudaMemcpyKind direction)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemcpy2D(:DEST void *dst, :SIZE size_t dpitch, :SRC const void *src,
+             size_t spitch, size_t width, size_t height,
+             :DIRECTION enum cudaMemcpyKind direction)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMallocArray(:OUT struct cudaArray **array,
+                :IN_DEEPCOPY const struct cudaChannelFormatDesc *desc,
+                size_t width, size_t height=0, unsigned int flags=0)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaFreeArray(struct cudaArray *array)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaConfigureCall(dim3 gridDim, dim3 blockDim,
+                  size_t sharedMem, cudaStream_t stream)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaSetupArgument(const void *arg, size_t size, size_t offset)
+)
+
+## FIXME: This needs custom handling
+#EXTERNC cudaError_t
+#cudaLaunch(const void *func)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaThreadSynchronize(void)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaGetLastError(void)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMallocPitch(:OUT void** devPtr, :OUT size_t* pitch,
+                 size_t width, size_t height)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceReset(void)
+)
+
+##FIXME:  Must implement :OFFSET keyword
+##FIXME:  symbol can be a "variable" on device, or a character string
+#           naming a variable on device.  :DEST will act as :OUT
+#           variable here, but :OUT variable doesn't handle strings.
+# kind is either cudaMemcpyHostToDevice or cudaMemcpyDeviceToDevice
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaMemcpyToSymbol(:DEST const void * symbol, :SRC const void * src,
+##                    :SIZE size_t count, :OFFSET size_t offset,
+##                    :DIRECTION enum cudaMemcpyKind kind)
+## )
+
+##FIXME:  Must implement :OUT_OPT keyword
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaBindTexture2D(:OUT_OPT size_t * offset,
+##                   const struct textureReference * texref,
+##                   const void * devPtr, const cudaChannelFormatDesc * desc,
+##                   size_t width, size_t height, size_t pitch)
+## )
+
+##FIXME:  Must implement :OUT_OPT keyword
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaBindTexture(:OUT_OPT size_t * offset, const textureReference * texref,
+## const void * devPtr, const cudaChannelFormatDesc * desc, size_t size)
+## )
+
+##FIXME:  pResViewDesc is an optional argument
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaCreateTextureObject(:OUT cudaTextureObject_t * pTexObject,
+  const struct cudaResourceDesc * pResDesc,
+  const struct cudaTextureDesc *pTexDesc,
+  const struct cudaResourceViewDesc * pResViewDesc)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaPeekAtLastError(void)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaProfilerStart(void)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaProfilerStop(void)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaStreamSynchronize(cudaStream_t stream)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaUnbindTexture(:IN const textureReference* texref)
+)
+
+## NOTE: cudaTextureObject_t is "an opaque value representing a CUDA
+#    texture object.  It is an opaque pointer (:IN - call-by-value)
+#    So, the default :IN suffices.
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDestroyTextureObject(cudaTextureObject_t texObject)
+)
+
+## FIXME: cudaEvent_t is "an opaque value represening a CUDA event
+#    Same questions as for cudaTextureObject_t above.
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaEventDestroy (cudaEvent_t event)
+)
+
+## FIXME: cudaEvent_t is "an opaque value represening a CUDA event
+#    Same questions as for cudaTextureObject_t above.
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaEventQuery (cudaEvent_t event)
+)
+
+## FIXME: This needs custom handling
+#EXTERNC cudaError_t
+#cudaFreeHost(void *ptr)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceCanAccessPeer(:OUT int* canAccessPeer, int device, int peerDevice)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceGetAttribute(:OUT int* value, cudaDeviceAttr attr, int device)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceSetCacheConfig(cudaFuncCache cacheConfig)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceSetSharedMemConfig(cudaSharedMemConfig config)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceSynchronize( void )
+)
+
+## FIXME: Must implement :OUT_DEEPCOPY
+#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
+#    So, we need the :OUT_DEEPCOPY tag (not yet implemented)
+# typedef struct CUevent_st* cudaEvent_t
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaEventCreateWithFlags(:OUT_DEPCOPY cudaEvent_t* event, unsigned int  flags)
+## )
+
+## FIXME: Must implement :OUT_DEEPCOPY
+#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
+# typedef struct CUevent_st* cudaEvent_t
+# CUDA_WRAPPER(
+# EXTERNC cudaError_t
+# cudaEventRecord(:IN_DEEPCOPYcudaEvent_t event, cudaStream_t stream)
+# )
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaFuncGetAttributes(:OUT cudaFuncAttributes* attr, const void* func)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaGetDevice(:OUT int* device)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaGetDeviceCount(:OUT int* count)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaGetDeviceProperties(:INOUT cudaDeviceProp* prop, int device)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemset(void* devPtr, int  value, size_t count)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaSetDevice(int device)
+)
+
+## FIXME: This needs custom handling.  It creates pinned memory on
+#    the proxy, but this will not be present on the application process.
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaMallocHost(:OUT void** ptr, size_t size )
+## )
+// FIXME:  Application will call cudaFree() instead of free() to free this.
+CUDA_VERBATIM_WRAPPER(
+EXTERNC cudaError_t
+cudaMallocHost(void** ptr, size_t size ) {
+  *ptr = malloc(size);
+  return cudaSuccess;
+};
+)
+
+## FIXME: typedef CUstream_st * cudaStream_t
+#    This needs custom handling if stream != 0.  In that case,
+#    stream must use :IN_DEEPCOPY
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemcpyAsync(:DEST void* dst, :SRC const void* src, :SIZE size_t count,
+                :DIRECTION cudaMemcpyKind kind, cudaStream_t stream = 0)
+
+## FIXME: typedef CUstream_st * cudaStream_t
+#    This needs custom handling if stream != 0.  In that case,
+#    stream must use :IN_DEEPCOPY
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemsetAsync(:IN void* devPtr, int value, size_t count,
+                cudaStream_t stream = 0)
+)
+
+# NOTE:  Because proxy is a fork of application process, the func ptr
+#        should be the same on proxy and application.  So, the default :IN
+#        tag suffices here.
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaOccupancyMaxActiveBlocksPerMultiprocessor(:OUT int *numBlocks,
+           const void *func, int blockSize, size_t dynamicSMemSize)
+)
