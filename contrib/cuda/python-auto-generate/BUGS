@@ -1,5 +1,4 @@
 TODO (from Rohan's comments):
- - Keep the externc; all the wrappers are C functions
  - cudaMemcpy2D has multiple "size" arguments (for e.g.: Height x Width)
    There could be other such functions where there's no single "size"
    argument, rather multiple arguments are used to compose the

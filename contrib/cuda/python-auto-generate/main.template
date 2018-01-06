@@ -88,10 +88,6 @@
 ########################################################################
 
 CUDA_WRAPPER(
-anyType cudaTest()
-)
-
-CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)
 )

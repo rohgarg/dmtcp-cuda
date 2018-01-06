@@ -414,7 +414,7 @@ def write_cuda_bodies(fnc, args):
   cuda_include.write("  OP_" + fnc["name"] + ",\n")
   cuda_include2.write("void FNC_" + fnc["name"] + "(void);\n")
 
-  cudawrappers.write("cudaError_t " + fnc_signature + "\n")
+  cudawrappers.write("EXTERNC cudaError_t\n" + fnc_signature + "\n")
   cudawrappers.write(cudawrappers_prolog)
   cudawrappers.write(
 """  // Write the IN arguments to the proxy
