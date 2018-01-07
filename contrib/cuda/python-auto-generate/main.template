@@ -283,15 +283,45 @@ cudaDeviceSynchronize( void )
 # typedef struct CUevent_st* cudaEvent_t
 ## CUDA_WRAPPER(
 ## EXTERNC cudaError_t
-## cudaEventCreateWithFlags(:OUT_DEPCOPY cudaEvent_t* event, unsigned int  flags)
+## cudaEventCreateWithFlags(:OUT_DEEPCOPY cudaEvent_t* event, unsigned int  flags)
 ## )
+
+# typedef struct CUevent_st* cudaEvent_t
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaEventCreate(:OUT_DEEPCOPY cudaEvent_t* event)
+## )
+
+## FIXME: Must implement :IN_DEEPCOPY
+#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
+# typedef struct CUevent_st* cudaEvent_t
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaEventDestroy(:IN_DEEPCOPY cudaEvent_t event)
+## )
+
+## FIXME: Must implement :IN_DEEPCOPY
+#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
+# typedef struct CUevent_st* cudaEvent_t
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaError_t cudaEventSynchronize(:IN_DEEPCOPY cudaEvent_t event)
+## )
+
+## FIXME: Must implement: IN_DEEPCOPY
+## CUDA_WRAPPER(
+## EXTERNC cudaError_t
+## cudaEventElapsedTime (:OUT float* ms, IN_DEEPCOPY cudaEvent_t start, IN_DEEPCOPY cudaEvent_t end)
+## )
+
+
 
 ## FIXME: Must implement :OUT_DEEPCOPY
 #    event is a ptr to event, and so ptr to ptr to struct CUevent_st
 # typedef struct CUevent_st* cudaEvent_t
 # CUDA_WRAPPER(
 # EXTERNC cudaError_t
-# cudaEventRecord(:IN_DEEPCOPYcudaEvent_t event, cudaStream_t stream)
+# cudaEventRecord(:IN_DEEPCOPY cudaEvent_t event, cudaStream_t stream)
 # )
 
 CUDA_WRAPPER(
@@ -363,4 +393,48 @@ CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaOccupancyMaxActiveBlocksPerMultiprocessor(:OUT int *numBlocks,
            const void *func, int blockSize, size_t dynamicSMemSize)
+)
+
+## FIXME: return value type is not "cudaError_t"
+#         check if the script handles this case.
+CUDA_WRAPPER(
+EXTERNC cudaChannelFormatDesc
+cudaCreateChannelDesc(int x, int y, int z, int w, cudaChannelFormatKind f)
+)
+
+## FIXME: func ptr is valid in the proxy address space as well. 
+##        should this be handled as a special case?
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaFuncSetCacheConfig (const void* func, cudaFuncCache cacheConfig)
+)
+
+## FIXME: the return value type is not "cudaError_t", it's "const char*"
+##        should this be handled as a special case?		
+CUDA_WRAPPER(
+EXTERNC const char*
+cudaGetErrorString(cudaError_t error)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemGetInfo(:OUT size_t* free, :OUT size_t* total)
+)
+
+## FIXME: cudaArray_t is a ptr and should be handled as such.
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset, :SRC const void* src, :SIZE size_t count, :DIRECTION enum cudaMemcpyKind kind)
+)
+
+## FIXME: cudaStream_t is a ptr to CUstream_st
+##        must implement: OUT_DEEPCOPY
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaStreamCreate(:OUT_DEEPCOPY cudaStream_t* pStream)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaThreadExit(void)
 )
