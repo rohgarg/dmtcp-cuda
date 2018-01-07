@@ -47,6 +47,17 @@
 #       EXAMPLE:  cudaError_t cudaMemcpy(:DEST void * dst,
 #		                :SRC const void * src, :SIZE size_t count,
 #		                :DIRECTION enum cudaMemcpyKind kind) 	
+#       EXAMPLE:  cudaError_t cudaMemcpy(:DEST void * dst,
+#		                :SRC const void * src, :SIZE size_t count,
+#		                :DIRECTION enum cudaMemcpyKind kind) 	
+#       Sometimes, the memory to be transferred is dpitch * height
+#         or spitch * height.  :DEST_PITCH, :SRC_PITCH, and :HEIGHT also exist.
+#       EXAMPLE:  cudaError_t cudaMemcpy2D(:DEST void *dst,
+#                               :DEST_PITCH size_t dpitch,
+#                               :SRC const void *src,
+#                               :SRC_PITCH size_t spitch,
+#                               size_t width, :HEIGHT size_t height,
+#                              :DIRECTION enum cudaMemcpyKind kind)
 #        
 # TODO:
 # cudaBindTexture2D - offset arg is :OUT_OPT because the ptr
@@ -103,17 +114,53 @@ cudaPointerGetAttributes(:OUT cudaPointerAttributes *attributes,
                          const void *ptr)
 )
 
-CUDA_WRAPPER(
-EXTERNC cudaError_t
-cudaMemcpy(:DEST void *pointer1, :SRC const void *pointer2, :SIZE size_t size,
-           :DIRECTION enum cudaMemcpyKind direction)
+# Required by cudaMemcpy and friends
+CUDA_VERBATIM_WRAPPER(
+EXTERNC static enum cudaMemcpyKind
+cudaMemcpyGetDirection(void *destPtr, void *srcPtr,
+                       enum cudaMemcpyKind *direction) {
+  cudaPointerAttributes destPtrAttr;
+  cudaPointerAttributes srcPtrAttr;
+  JASSERT(cudaPointerGetAttributes(&destPtrAttr, destPtr) == cudaSuccess)\
+                                   .Text("Error getting pointer properties");
+  JASSERT(cudaPointerGetAttributes(&srcPtrAttr, srcPtr) == cudaSuccess)\
+                                   .Text("Error getting pointer properties");
+  if (destPtrAttr.memoryType == cudaMemoryTypeHost &&
+      srcPtr.memoryType == cudaMemoryTypeHost) {
+    *direction = cudaMemcpyHostToHost;
+  } else if (destPtrAttr.memoryType == cudaMemoryTypeHost &&
+             srcPtr.memoryType == cudaMemoryTypeDevice) {
+    *direction = cudaMemcpyDeviceToHost;
+  } else if (destPtrAttr.memoryType == cudaMemoryTypeDevice &&
+             srcPtr.memoryType == cudaMemoryTypeHost) {
+    *direction = cudaMemcpyHostToDevice;
+  } else if (destPtrAttr.memoryType == cudaMemoryTypeDevice &&
+             srcPtr.memoryType == cudaMemoryTypeDevice) {
+    *direction = cudaMemcpyDeviceToDevice;
+  } else {
+    JASSERT(false).Text("DMTCP/CUDA internal error");
+  }
+  return cudaSuccess;
+}
 )
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaMemcpy2D(:DEST void *dst, :SIZE size_t dpitch, :SRC const void *src,
-             size_t spitch, size_t width, size_t height,
-             :DIRECTION enum cudaMemcpyKind direction)
+cudaMemcpy(:DEST void *dst, :SRC const void *src, :SIZE size_t count,
+           :DIRECTION enum cudaMemcpyKind kind)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemcpy2D(:DEST void *dst, :DEST_PITCH size_t dpitch, :SRC const void *src,
+             :SRC_PITCH size_t spitch, size_t width, :HEIGHT size_t height,
+             :DIRECTION enum cudaMemcpyKind kind)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaPointerGetAttributes(int device, void *devicePointer, void *hostPointer,
+                         int isManaged)
 )
 
 CUDA_WRAPPER(
@@ -424,7 +471,9 @@ cudaMemGetInfo(:OUT size_t* free, :OUT size_t* total)
 ## FIXME: cudaArray_t is a ptr and should be handled as such.
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset, :SRC const void* src, :SIZE size_t count, :DIRECTION enum cudaMemcpyKind kind)
+cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset,
+                  :SRC const void* src, :SIZE size_t count,
+                  :DIRECTION enum cudaMemcpyKind kind)
 )
 
 ## FIXME: cudaStream_t is a ptr to CUstream_st

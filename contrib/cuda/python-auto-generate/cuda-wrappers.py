@@ -201,73 +201,100 @@ def var_from_inout(args, tag):
   else:
     return ""
 
-#  FIXME:  We assume that host memory is allocated using
+#  FIXME:  Host memory can be allocated using
 #          either cudaMallocHost() or cudaHostAlloc() or malloc().  But note
 #          that cudaMallocHost(), etc. can be pinnned memory in proxy process.
 def cudaMemcpyExtraCode(args):
   (application_before, application_after, proxy_before, proxy_after) = 4*[""]
-  dest = var_from_inout(args, "DEST")
-  src = var_from_inout(args, "SRC")
-  count = var_from_inout(args, "SIZE")
-  kind = var_from_inout(args, "DIRECTION")
-  # Generate non-trivial extra card only if "DIRECTION" tag was specified.
-  if kind:
-    # Add trivial test for unimplemented cases first.
-    application_before = application_before + (
-"""  if (""" + kind + """ == cudaMemcpyHostToHost ||
-      """ + kind + """ == cudaMemcpyDeviceToDevice ||
-      """ + kind + """ == cudaMemcpyDefault) {
-    fprintf(stderr, "****** DMTCP/CUDA: this kind (%d) not yet implemented\\n",
-                    """ + kind + """);
-  };
+  args_dict = {}
+  for key in ["DEST", "SRC", "SIZE", "DEST_PITCH", "SRC_PITCH", "HEIGHT",
+              "DIRECTION"]:
+    args_dict[key] = None  # Default for standard keys is: None
+  for arg in args:
+    args_dict[arg["inout"][0]] = arg["name"]
+  # Generate non-trivial extra code only if "DIRECTION" tag was specified.
+  if not args_dict["DIRECTION"]:
+    return (application_before, application_after, proxy_before, proxy_after)
+
+  assert args_dict["DIRECTION"] != "direction"  # Check no name clash
+  application_before += (
+"""  enum cudaMemcpyKind direction;
+  cudaMemcpyGetDirection(destPtr, srcPtr, &direction);
 """)
-    application_before = application_before + (
-"""  if (""" + kind + """ == cudaMemcpyHostToDevice) {
-    // :DEST acts like :OUT_BUF and :SRC acts like :IN_BUF using :SIZE
-    // Send """ + src + """ buffer to proxy process
-    // FIXME:  If """ + src + """ allocated as cudaMallocHost()
-    //         or cudaHostAlloc() pinned memory,
-    //         this cannot work within the application process.
-    JASSERT(write(skt_master, """ + src + ", " + count + """) == """ +
-                  count + """)
-           (JASSERT_ERRNO);
+
+  assert "size" not in args_dict.values()  # Avoid name clash
+  application_before += (
+"""  int size = -1;
+""")
+
+  if args_dict["SIZE"]:
+    assert not args_dict["HEIGHT"]
+  else:
+    assert len([True for key in ["DEST_PITCH", "SRC_PITCH", "HEIGHT"]
+                     if key in args_dict.keys()]) == 3
+
+  if args_dict["SIZE"]:
+    size_appl_send = size_proxy_recv = (
+"""size = %s;""") % args_dict["SIZE"]
+  else:
+    size_appl_send = size_proxy_recv = (
+"""size == %s * %s;""") % (args_dict["SRC_PITCH"], args_dict["HEIGHT"])
+
+  if args_dict["SIZE"]:
+    size_proxy_send = size_appl_recv = (
+"""size = %s;""") % args_dict["SIZE"]
+  else:
+    size_proxy_send = size_appl_recv = (
+"""size == %s * %s;""") % (args_dict["DEST_PITCH"], args_dict["HEIGHT"])
+
+  application_before += (
+"""  %s
+  if (direction == cudaMemcpyHostToDevice ||
+      direction == cudaMemcpyHostToHost) {
+    // Send source buffer to proxy process
+    // NOTE: As an optimization, HostToHost could be done locally.
+    // NOTE:  This assumes no pinnned memory.
+    JASSERT(write(skt_master, %s, size) == size) (JASSERT_ERRNO);
   }
-""")
-    proxy_before = proxy_before + (
-"""  if (""" + kind + """ == cudaMemcpyHostToDevice) {
-    // Receive """ + src + """ buffer from application process
-    // :DEST acts like :OUT_BUF and :SRC acts like :IN_BUF using :SIZE
-    """ + src + """ = malloc(""" + count + """);
-    JASSERT(read(skt_master, """ + src + ", " + count + """) == """ +
-                  count + """)
-           (JASSERT_ERRNO);
+""" % (size_appl_send, args_dict["SRC"]))
+
+  proxy_before += (
+"""  %s
+  if (direction == cudaMemcpyHostToDevice ||
+      direction == cudaMemcpyHostToHost) {
+    // Receive source buffer from application process
+    %s = malloc(size);
+    JASSERT(read(skt_master, %s, size) == size) (JASSERT_ERRNO);
     // Get ready for receiving memory from device when making CUDA call
-    """ + dest + """ = malloc(""" + count + """);
+    %s
+    // NEEDED FOR DeviceToHost; SHOULD REUSE OLD malloc() for HostToHost
+    // NOTE:  This assumes no pinnned memory.
+    %s = malloc(size);
   }
-""")
-    proxy_after = proxy_after + (
-"""  if (""" + kind + """ == cudaMemcpyDeviceToHost) {
-    // Send """ + dest + """ buffer to application process
-    // :DEST acts like :OUT_BUF and :SRC acts like :IN_BUF using :SIZE
-    free(""" + src + """);
-    JASSERT(write(skt_master, """ + dest + ", " + count + """) == """ +
-                  count + """)
-           (JASSERT_ERRNO);
-    free(""" + dest + """);
+""" % (size_proxy_recv, args_dict["SRC"], args_dict["SRC"], size_proxy_send,
+       args_dict["DEST"]))
+
+  proxy_after += (
+"""  if (direction == cudaMemcpyDeviceToHost ||
+         direction == cudaMemcpyHostToHost) {
+    // Send  dest buffer to application process
+    // NOTE:  This assumes no pinnned memory.
+    free(%s);
+    JASSERT(write(skt_master, %s, size) == size) (JASSERT_ERRNO);
+    free(%s);
   }
-""")
-    application_after = application_after + (
-"""  if (""" + kind + """ == cudaMemcpyDeviceToHost) {
-    // :DEST acts like :OUT_BUF and :SRC acts like :IN_BUF using :SIZE
-    // Receive """ + dest + """ buffer from proxy process
-    // FIXME:  If """ + dest + """ allocated as cudaMallocHost()
-    //         or cudaHostAlloc() pinned memory,
-    //         this cannot work within the application process.
-    JASSERT(read(skt_master, """ + dest + ", " + count + """) == """ +
-                  count + """)
-           (JASSERT_ERRNO);
+""" % (args_dict["SRC"], args_dict["DEST"], args_dict["DEST"]))
+
+  application_after += (
+"""  %s
+  if (direction == cudaMemcpyDeviceToHost ||
+      direction == cudaMemcpyHostToHost) {
+    // Receive dest buffer from proxy process
+    // NOTE:  This assumes no pinnned memory.
+    JASSERT(read(skt_master, %s, size) == size) (JASSERT_ERRNO);
   }
-""")
+""" % (size_appl_recv, args_dict["DEST"]))
+
   return (application_before, application_after, proxy_before, proxy_after)
   # End of 'cudaMemcpyExtraCode(args)'
 
@@ -465,7 +492,7 @@ def write_cuda_bodies(fnc, args):
 """)
   else:
     cudawrappers.write(
-"""  // No arguments to receive.  Will not read from skt_master.
+"""  // No primitive arguments to receive.  Will not read args from skt_master.
 """)
   for arg in args:
     if arg["inout"][0] in ["OUT", "INOUT"]:
@@ -519,7 +546,7 @@ def write_cuda_bodies(fnc, args):
   chars_rcvd = """ + args_in_sizeof + """;
   assert(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd);"""
   if len(args_in_sizeof) > 0
-  else "  // No arguments to receive.  Will not read from skt_master.") +
+  else "  // No primitive args to receive.  Will not read from skt_master.") +
 """
   chars_rcvd = 0;
 """)

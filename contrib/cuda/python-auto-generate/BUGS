@@ -3,6 +3,9 @@ TODO (from Rohan's comments):
    There could be other such functions where there's no single "size"
    argument, rather multiple arguments are used to compose the
    final "size" argument. We need a mechanism for specifying this.
+   [ *** THIS IS IMPLEMENTED NOW.  BUT I HAVE NOT TESTED COMPILING
+        THE GENERATED C CODE. *** ]
+ - Create CUDA_WRAPPER_WITH_LOGGING()
 
 cudaBindTexture2D - offset is :IN because the ptr might be NULL on input
         (meaning the output will not be set)
