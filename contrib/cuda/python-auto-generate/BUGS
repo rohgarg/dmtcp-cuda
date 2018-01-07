@@ -5,7 +5,26 @@ TODO (from Rohan's comments):
    final "size" argument. We need a mechanism for specifying this.
    [ *** THIS IS IMPLEMENTED NOW.  BUT I HAVE NOT TESTED COMPILING
         THE GENERATED C CODE. *** ]
+
  - Create CUDA_WRAPPER_WITH_LOGGING()
+   [ *** THIS IS IMPLEMENTED NOW.  BUT I HAVE NOT TESTED COMPILING
+        THE GENERATED C CODE.  ALSO, I'M GUESSING WHICH CUDA FNC'S
+        SHOULD USE LOGGING.  FINALLY, I HAVE A SAMPLE file,
+        log_append_and_read.cpp, IN WHICH i REWROTE THOSE FUNCTIONS
+        TO BE COMPATIBLE WJTH THE auto-generated code. *** ]
+
+Still need to implement :IN_DEEPCOPY
+
+At checkpoint time, we really should be copying from device memory
+  to the application process just before writing the checkpoint.
+Instead, it seems like we're still logging all of the cudaMemcpy's.
+This is grossly inefficient, both at run time, and at restart time.
+In particular, we have a struct called cudaSyscallStructure for logging.
+  It is passed in as an argument.  This is really inefficient, because
+  it means we're copying from the log file to a huge call frame on
+  the stack, and then finally into the heap (I hope).
+Apparently, we're doing this because we do not yet save the device pointers
+  that were created.
 
 cudaBindTexture2D - offset is :IN because the ptr might be NULL on input
         (meaning the output will not be set)

@@ -97,11 +97,15 @@ void proxy_initialize(void)
 // append a cuda system call structure to it
 void log_append(cudaSyscallStructure record)
 {
+  printf("**** OBSOLETE:  Please re-write to use log/replay style from"
+         "log_append_and_read.cpp\n");
   JASSERT(write(logFd, &record, sizeof(record)) != -1)(JASSERT_ERRNO);
 }
 
 bool log_read(cudaSyscallStructure *record)
 {
+  printf("**** OBSOLETE:  Please re-write to use log/replay style from"
+         "log_append_and_read.cpp\n");
   int ret = read(logFd, record, sizeof(*record));
   if (ret == -1) {
     JASSERT(false)(JASSERT_ERRNO);

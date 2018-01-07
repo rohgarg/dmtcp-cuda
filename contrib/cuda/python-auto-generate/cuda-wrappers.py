@@ -135,8 +135,9 @@ print ast_wrappers
 # INPUT:  ast_wrappers (ast := Abstract Syntax Tree)
 # OUTPUT: ast_annotated_wrappers
 
-def generate_annotated_wrapper(ast):  # abstract syntax tree
-  fnc = { "type" : ' '.join(ast[0][:-1]), "name" : ast[0][-1] }
+def generate_annotated_wrapper(isLogging, ast):  # abstract syntax tree
+  fnc = { "type" : ' '.join(ast[0][:-1]), "name" : ast[0][-1],
+          "isLogging" : isLogging }
   args = []
   raw_args = ast[1:][0][1:-1]  # Omit '(' and ')'
   # For 'int foo(void)', 'void' was parsed as a separate arg; remove it now.
@@ -171,10 +172,11 @@ def generate_annotated_wrapper(ast):  # abstract syntax tree
 ast_annotated_wrappers = []
 while ast_wrappers:
   # ast_wrappers[0] : ['CUDA_WRAPPER' '(' FNC ARGS ')']
-  if ast_wrappers[0][0] == "CUDA_WRAPPER":
+  if ast_wrappers[0][0] in ["CUDA_WRAPPER", "CUDA_WRAPPER_WITH_LOGGING"]:
+    isLogging = ast_wrappers[0][0] == "CUDA_WRAPPER_WITH_LOGGING"
     del ast_wrappers[0]
-    ast_annotated_wrappers.append( generate_annotated_wrapper(
-                                                   ast_wrappers[0][1:3]) )
+    ast_annotated_wrappers.append( generate_annotated_wrapper( isLogging,
+                                                        ast_wrappers[0][1:3]) )
     del ast_wrappers[0]
   else:
     warnings.warn("Expression is not equal to CUDA_WRAPPER")
@@ -204,7 +206,7 @@ def var_from_inout(args, tag):
 #  FIXME:  Host memory can be allocated using
 #          either cudaMallocHost() or cudaHostAlloc() or malloc().  But note
 #          that cudaMallocHost(), etc. can be pinnned memory in proxy process.
-def cudaMemcpyExtraCode(args):
+def cudaMemcpyExtraCode(args, isLogging):
   (application_before, application_after, proxy_before, proxy_after) = 4*[""]
   args_dict = {}
   for key in ["DEST", "SRC", "SIZE", "DEST_PITCH", "SRC_PITCH", "HEIGHT",
@@ -257,6 +259,15 @@ def cudaMemcpyExtraCode(args):
     JASSERT(write(skt_master, %s, size) == size) (JASSERT_ERRNO);
   }
 """ % (size_appl_send, args_dict["SRC"]))
+  # NOTE:  We should not be logging these large buggers.
+  #   We should only log CUDA fnc'only with prim. args; e.g., not cudaMemcpy()
+  application_before = application_before[:-1] # Remove last brace of '{...}'
+  if (isLogging):
+    # Add '{' in comment, so editors will see balanced braces.
+    cudawrappers.write(
+"""log_append(%s, size);
+  }
+""" % args_dict["SRC"])
 
   proxy_before += (
 """  %s
@@ -296,7 +307,7 @@ def cudaMemcpyExtraCode(args):
 """ % (size_appl_recv, args_dict["DEST"]))
 
   return (application_before, application_after, proxy_before, proxy_after)
-  # End of 'cudaMemcpyExtraCode(args)'
+  # End of 'cudaMemcpyExtraCode(args, isLogging)'
 
 # Not currently used
 def MEMCPY(dest, source, size=None, buf_offset=None):
@@ -418,8 +429,8 @@ def write_cuda_bodies(fnc, args):
     proxy_initialize();
 
   cudaError_t ret_val;
-  char send_buf[100];
-  char recv_buf[100];
+  char send_buf[1000];
+  char recv_buf[1000];
   int chars_sent = 0;
   int chars_rcvd = 0;
 
@@ -436,7 +447,7 @@ def write_cuda_bodies(fnc, args):
   # This code process the messages due to cudaMemcpy as extra messages.
   # It is inserted after sending and receiving messages in application and proxy
   (application_before, application_after, proxy_before, proxy_after) = \
-    cudaMemcpyExtraCode(args)
+    cudaMemcpyExtraCode(args, fnc["isLogging"])
 
   cuda_include.write("  OP_" + fnc["name"] + ",\n")
   cuda_include2.write("void FNC_" + fnc["name"] + "(void);\n")
@@ -464,6 +475,11 @@ def write_cuda_bodies(fnc, args):
   // Send op code and args to proxy
   JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
          (JASSERT_ERRNO);
+""")
+  # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
+  if (fnc["isLogging"]):
+    cudawrappers.write(
+"""  log_append(send_buf, chars_sent);
 """)
   # This occurs before we send to the proxy process because
   #   application_before does not use send_buf.  It does its own send,

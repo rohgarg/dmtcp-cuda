@@ -88,6 +88,12 @@
 #   We must re-use the input memory on output
 # EXAMPLE: cudaGetDeviceProperties(:INOUT cudaDeviceProp* prop, int device)
 # 
+#===========================
+# TOP-LEVEL STATEMENTS:
+# CUDA_WRAPPER(...) -- uses function signature with tags described above
+# CUDA_WRAPPER_WITH_LOGGING(...) -- same, but also calls log_append()
+#                                   for log-and-replay.
+#
 # CUDA_VERBATIM_WRAPPER(...) -- inserts code directly into cudawrapper.icc
 #   For technical reasons, comments in the code are not currently preserved.
 #                               
@@ -97,6 +103,11 @@
 ########################################################################
 # These signatures are taken from the github repo, from cuda-wrappers.cpp
 ########################################################################
+
+CUDA_WRAPPER_WITH_LOGGING(
+EXTERNC cudaError_t
+cudaMalloc(:OUT void **pointer, size_t size)
+)
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
@@ -206,7 +217,7 @@ cudaMallocPitch(:OUT void** devPtr, :OUT size_t* pitch,
                  size_t width, size_t height)
 )
 
-CUDA_WRAPPER(
+CUDA_WRAPPER_WITH_LOGGING(
 EXTERNC cudaError_t
 cudaDeviceReset(void)
 )
@@ -444,7 +455,7 @@ cudaOccupancyMaxActiveBlocksPerMultiprocessor(:OUT int *numBlocks,
 
 ## FIXME: return value type is not "cudaError_t"
 #         check if the script handles this case.
-CUDA_WRAPPER(
+CUDA_WRAPPER_WITH_LOGGING(
 EXTERNC cudaChannelFormatDesc
 cudaCreateChannelDesc(int x, int y, int z, int w, cudaChannelFormatKind f)
 )
@@ -478,7 +489,7 @@ cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset,
 
 ## FIXME: cudaStream_t is a ptr to CUstream_st
 ##        must implement: OUT_DEEPCOPY
-CUDA_WRAPPER(
+CUDA_WRAPPER_WITH_LOGGING(
 EXTERNC cudaError_t
 cudaStreamCreate(:OUT_DEEPCOPY cudaStream_t* pStream)
 )
