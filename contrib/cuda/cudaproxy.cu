@@ -31,6 +31,10 @@
 # endif // ifdef __cplusplus
 #endif // ifndef EXTERNC
 
+#ifdef PYTHON_AUTO_GENERATE
+# include "python-auto-generate/cudaproxy.icu"
+#endif
+
 #ifdef USE_SHM
 int shmID;
 void *shmaddr;
@@ -38,7 +42,9 @@ void *shmaddr;
 
 static trampoline_info_t main_trampoline_info;
 
+#ifndef PYTHON_AUTO_GENERATE
 static int compute(int fd, cudaSyscallStructure *structure);
+#endif
 static int start_proxy(void);
 
 // This is the trampoline destination for the user main; this does not return
@@ -113,6 +119,12 @@ static int start_proxy(void)
   }
 #endif
 
+#ifdef PYTHON_AUTO_GENERATE
+  // do_work() has an infinite 'while(1)' loop.
+  do_work(); // never returns
+  return 0;  // To satisfy compiler
+#else
+
   int return_val;
   cudaSyscallStructure structure;
 
@@ -156,9 +168,11 @@ static int start_proxy(void)
     }
 
    }
+#endif
 }
 
 
+#ifndef PYTHON_AUTO_GENERATE
 int compute(int fd, cudaSyscallStructure *structure)
 {
   int return_val;
@@ -520,9 +534,9 @@ int compute(int fd, cudaSyscallStructure *structure)
       size_t offset = (structure->syscall_type).cuda_setup_argument.offset;
 
       void *arg = malloc(size);
-#ifdef USE_SHM
+# ifdef USE_SHM
       memcpy(arg, shmaddr, size);
-#endif
+# endif
       if (read(fd, arg, size) == -1)
       {
         perror("read()");
@@ -735,3 +749,4 @@ int compute(int fd, cudaSyscallStructure *structure)
 
   return return_val;
 }
+#endif

@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
+#include "python-auto-generate/cuda_plugin.h"
+
 #ifndef STANDALONE
 #include <stdint.h>
 
@@ -63,7 +65,6 @@ extern struct sockaddr_un sa_proxy;
 extern bool enableCudaCallLogging;
 #endif // ifndef STANDALONE
 
-#ifndef PYTHON_AUTO_GENERATE
 enum cuda_syscalls
 {
   CudaMalloc,
@@ -428,9 +429,6 @@ typedef struct
   const void *payload;
   size_t payload_size;
 } cudaSyscallStructure;
-#else
-# include "python-auto-generate/cuda_plugin.h"
-#endif
 
 #ifndef STANDALONE
 
@@ -468,7 +466,10 @@ void register_all_pages();
 void flushDirtyPages();
 
 // This is now static, scope within one file
-// dmtcp::map<void*, void*>& shadowPageMap();
+// dmtcp::map<void*, void*>& shadowPageMap()fdef PYTHON_AUTO_GENERATE
+//  askdaj aslkdas;
+//  #endif
+//  ;
 
 #endif // ifndef STANDALONE
 
