@@ -104,11 +104,6 @@
 # These signatures are taken from the github repo, from cuda-wrappers.cpp
 ########################################################################
 
-CUDA_WRAPPER_WITH_LOGGING(
-EXTERNC cudaError_t
-cudaMalloc(:OUT void **pointer, size_t size)
-)
-
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)
@@ -132,9 +127,9 @@ cudaMemcpyGetDirection(void *destPtr, void *srcPtr,
                        enum cudaMemcpyKind *direction) {
   cudaPointerAttributes destPtrAttr;
   cudaPointerAttributes srcPtrAttr;
-  JASSERT(cudaPointerGetAttributes(&destPtrAttr, destPtr) == cudaSuccess)\
+  JASSERT(cudaPointerGetAttributes(&destPtrAttr, destPtr) == cudaSuccess)
                                    .Text("Error getting pointer properties");
-  JASSERT(cudaPointerGetAttributes(&srcPtrAttr, srcPtr) == cudaSuccess)\
+  JASSERT(cudaPointerGetAttributes(&srcPtrAttr, srcPtr) == cudaSuccess)
                                    .Text("Error getting pointer properties");
   if (destPtrAttr.memoryType == cudaMemoryTypeHost &&
       srcPtr.memoryType == cudaMemoryTypeHost) {
@@ -166,12 +161,6 @@ EXTERNC cudaError_t
 cudaMemcpy2D(:DEST void *dst, :DEST_PITCH size_t dpitch, :SRC const void *src,
              :SRC_PITCH size_t spitch, size_t width, :HEIGHT size_t height,
              :DIRECTION enum cudaMemcpyKind kind)
-)
-
-CUDA_WRAPPER(
-EXTERNC cudaError_t
-cudaPointerGetAttributes(int device, void *devicePointer, void *hostPointer,
-                         int isManaged)
 )
 
 CUDA_WRAPPER(
@@ -290,12 +279,6 @@ cudaUnbindTexture(:IN const textureReference* texref)
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaDestroyTextureObject(cudaTextureObject_t texObject)
-)
-
-## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
-CUDA_WRAPPER(
-EXTERNC cudaError_t
-cudaEventDestroy (:IN cudaEvent_t event)
 )
 
 ## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
