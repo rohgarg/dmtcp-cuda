@@ -23,7 +23,7 @@
 ########################################################################
 
 # Optional tags for each argument in a function signature:
-# (In cuda-wrappers.py, this is stored as the value of the "inout" key.)
+# (In cuda-wrappers.py, this is stored as the value of the "tag" key.)
 #
 # :IN - in parameter (copy-by-value); This is the default if no tag present.
 #       The application process passes this to the proxy process.

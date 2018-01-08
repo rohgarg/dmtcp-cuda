@@ -156,16 +156,16 @@ def generate_annotated_wrapper(isLogging, ast):  # abstract syntax tree
        isinstance(raw_args[1], list) and raw_args[1][0] == "(":
       # example: :IN_DEEP_COPY(len) ...
       #       => [[":IN_DEEP_COPY"], ["(", ["len"], ")"] ...]
-      inout = [ arg[0][1:], raw_args[1][1][0] ]
+      tag = [ arg[0][1:], raw_args[1][1][0] ]
       del raw_args[0:2]
       arg = raw_args[0]
     elif isinstance(arg[0], str) and arg[0].startswith(':'):
       # example: [:IN ...]
-      inout = [arg[0][1:]] # Strip initial ':'
+      tag = [arg[0][1:]] # Strip initial ':'
       del arg[0]
     else:
-      inout = ["IN"]  # Default value
-    args.append( { "inout" : inout , "type" : ' '.join(arg[:-1]),
+      tag = ["IN"]  # Default value
+    args.append( { "tag" : tag , "type" : ' '.join(arg[:-1]),
                    "optional" : optional , "name" : arg[-1] } )
     del raw_args[0]
   return { "FNC" : fnc , "ARGS" : args }
@@ -193,17 +193,6 @@ while ast_wrappers:
 
 # ====
 # Utilities for CudaMemcpy, cudaMallocHost, etc.
-var_inout_dict = None
-var_inout_current_args = None
-def var_from_inout(args, tag):
-  if var_inout_current_args != args:
-    var_inout_dict = {}
-    for arg in args:
-      var_inout_dict[arg["inout"][0]] = arg["name"]
-  if tag in var_inout_dict.keys():
-    return var_inout_dict[tag]
-  else:
-    return ""
 
 #  FIXME:  Host memory can be allocated using
 #          either cudaMallocHost() or cudaHostAlloc() or malloc().  But note
@@ -215,7 +204,7 @@ def cudaMemcpyExtraCode(args, isLogging):
               "DIRECTION"]:
     args_dict[key] = None  # Default for standard keys is: None
   for arg in args:
-    args_dict[arg["inout"][0]] = arg["name"]
+    args_dict[arg["tag"][0]] = arg["name"]
   # Generate non-trivial extra code only if "DIRECTION" tag was specified.
   if not args_dict["DIRECTION"]:
     return (application_before, application_after, proxy_before, proxy_after)
@@ -463,11 +452,11 @@ def write_cuda_bodies(fnc, args):
   chars_sent += sizeof cuda_op;
 """ % (fnc["name"], fnc["name"]))
   for arg in args:
-    if arg["inout"][0] == "IN":
+    if arg["tag"][0] == "IN":
       (var, size) = (arg["name"], "sizeof " + arg["name"])
       cudawrappers.write(("  memcpy(send_buf + chars_sent, & %s, %s);\n" +
                           "  chars_sent += %s;\n") % (var, size, size))
-    elif arg["inout"][0] in ["IN_DEEPCOPY", "INOUT"]:
+    elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
       (var, size) = (arg["name"], "sizeof *" + arg["name"])
       cudawrappers.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
                           "  chars_sent += %s;\n") % (var, size, size))
@@ -489,7 +478,7 @@ def write_cuda_bodies(fnc, args):
   cudawrappers.write(application_before)
 
   args_out_sizeof = [" + sizeof *" + arg["name"] for arg in args
-                                      if arg["inout"][0] in ["OUT", "INOUT"]]
+                                      if arg["tag"][0] in ["OUT", "INOUT"]]
   args_out_sizeof = ''.join(args_out_sizeof)
   if len(args_out_sizeof) >= 3:
     args_out_sizeof = args_out_sizeof[3:]  # Remove initial " + "
@@ -513,7 +502,7 @@ def write_cuda_bodies(fnc, args):
 """  // No primitive arguments to receive.  Will not read args from skt_master.
 """)
   for arg in args:
-    if arg["inout"][0] in ["OUT", "INOUT"]:
+    if arg["tag"][0] in ["OUT", "INOUT"]:
       (var, size) = (arg["name"], "sizeof *" + arg["name"])
       # Strip one '*' from arg["type"] on next line
       assert arg["type"].rstrip().endswith('*')
@@ -548,9 +537,9 @@ def write_cuda_bodies(fnc, args):
   int chars_sent = 0;
 """)
   args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
-                                              if arg["inout"][0] == "IN"]
+                                              if arg["tag"][0] == "IN"]
   args_in_sizeof += [" + sizeof *" + arg["name"] for arg in args
-                                if arg["inout"][0] in ["IN_DEEPCOPY", "INOUT"]]
+                                if arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]]
   args_in_sizeof = ''.join(args_in_sizeof)
   if len(args_in_sizeof) >= 3:
     args_in_sizeof = args_in_sizeof[3:]  # Remove initial " + "
@@ -569,11 +558,11 @@ def write_cuda_bodies(fnc, args):
   chars_rcvd = 0;
 """)
   for arg in args:
-    if arg["inout"][0] == "IN":
+    if arg["tag"][0] == "IN":
       (var, size) = (arg["name"], "sizeof " + arg["name"])
       cudaproxy2.write(("  memcpy(&%s, recv_buf + chars_rcvd, %s);\n" +
                         "  chars_rcvd += %s;\n") % (var, size, size))
-    elif arg["inout"][0] in ["IN_DEEPCOPY", "INOUT"]:
+    elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
       # Typically, the cuda parameter is of type:  struct cudaSomething *param
       # Strip one '*' from arg["type"] on next line
       (type, base_var, size) = (arg["type"].rstrip()[:-1].rstrip(),
@@ -591,19 +580,19 @@ def write_cuda_bodies(fnc, args):
   #   since this was typically a pointer to a buffer in the application code.
   cudaproxy2.write(proxy_before)
 
-  args_out = [arg for arg in args if arg["inout"][0] in ["OUT", "INOUT"]]
+  args_out = [arg for arg in args if arg["tag"][0] in ["OUT", "INOUT"]]
   # FIXME:  This "// Declare base variables" seems to be repeated. Remove???
   if len(args_out) > 0:
     cudaproxy2.write("""
   // Declare base variables for OUT arguments to point to
 """)
   for arg in args_out:
-    if arg["inout"][0] in ["OUT", "INOUT"]:
+    if arg["tag"][0] in ["OUT", "INOUT"]:
       # Strip one '*' from arg["type"] on next line
       (type, base_var) = (arg["type"].rstrip()[:-1].rstrip(),
                           "base_" + arg["name"])
       assert arg["type"].rstrip()[-1] == '*'
-      if arg["inout"][0] in ["OUT"]:
+      if arg["tag"][0] in ["OUT"]:
         cudaproxy2.write(("  %s %s;\n") % (type, base_var))
       cudaproxy2.write(("  %s = &%s;\n") % (arg["name"], base_var))
 
@@ -617,7 +606,7 @@ def write_cuda_bodies(fnc, args):
   // Write back the arguments to the application
 """)
   for arg in args:
-    if arg["inout"][0] in ["OUT", "INOUT"]:
+    if arg["tag"][0] in ["OUT", "INOUT"]:
       (var, size) = (arg["name"], "sizeof *" + arg["name"])
       cudaproxy2.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
                         "  chars_sent += %s;\n") % (var, size, size))
