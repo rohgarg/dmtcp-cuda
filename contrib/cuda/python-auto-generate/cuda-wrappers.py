@@ -128,7 +128,8 @@ def parse_aux(input, rest):
   return (parsed, rest)
 
 ast_wrappers = parse(myinput)
-print ast_wrappers
+#For debugging:
+# print ast_wrappers
 
 # ===================================================================
 # CONVERT AST INTO ANNOTATED AST
@@ -182,7 +183,8 @@ while ast_wrappers:
     warnings.warn("Expression is not equal to CUDA_WRAPPER")
     del ast_wrappers[0:2]
 
-print ast_annotated_wrappers
+#For debugging:
+# print ast_annotated_wrappers
 
 # ===================================================================
 # EMIT GENERATED CODE

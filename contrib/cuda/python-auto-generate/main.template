@@ -70,7 +70,7 @@
 #		   const void *devPtr,
 #		   :IN_DEEPCOPY const struct cudaChannelFormatDesc *desc,
 #		   size_t width, size_t height, size_t pitch) 	
-# :IN_DEEPCOPY -
+# :IN_DEEPCOPY - typically a ptr to a struct; :SIZE not required.
 #  EXAMPLE:  :IN_DEEPCOPY mytype_t * arg ; Must copy: sizeof mytype_t
 #  EXAMPLE:  int pthread_create(:OUT pthread_t *thread,
 #                               :IN_DEEPCOPY const pthread_attr_t *attr,
@@ -350,27 +350,25 @@ cudaDeviceSynchronize( void )
 ## cudaEventCreate(:OUT_DEEPCOPY cudaEvent_t* event)
 ## )
 
-## FIXME: Must implement :IN_DEEPCOPY
 #    event is a ptr to event, and so ptr to ptr to struct CUevent_st
 # typedef struct CUevent_st* cudaEvent_t
-## CUDA_WRAPPER(
-## EXTERNC cudaError_t
-## cudaEventDestroy(:IN_DEEPCOPY cudaEvent_t event)
-## )
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaEventDestroy(:IN_DEEPCOPY cudaEvent_t event)
+)
 
-## FIXME: Must implement :IN_DEEPCOPY
 #    event is a ptr to event, and so ptr to ptr to struct CUevent_st
 # typedef struct CUevent_st* cudaEvent_t
-## CUDA_WRAPPER(
-## EXTERNC cudaError_t
-## cudaError_t cudaEventSynchronize(:IN_DEEPCOPY cudaEvent_t event)
-## )
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaError_t cudaEventSynchronize(:IN_DEEPCOPY cudaEvent_t event)
+)
 
-## FIXME: Must implement: IN_DEEPCOPY
-## CUDA_WRAPPER(
-## EXTERNC cudaError_t
-## cudaEventElapsedTime (:OUT float* ms, IN_DEEPCOPY cudaEvent_t start, IN_DEEPCOPY cudaEvent_t end)
-## )
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaEventElapsedTime (:OUT float* ms, :IN_DEEPCOPY cudaEvent_t start,
+                      :IN_DEEPCOPY cudaEvent_t end)
+)
 
 
 
