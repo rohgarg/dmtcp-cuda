@@ -17,9 +17,9 @@
 #        We need this information to decide if a type is a pointer, or a
 #        struct, or other.  Some types that we require for the declarations are:
 #   cudaError_t - [PRIM] int (enum)
-#   cudaStream_t - [PTR{ typedef CUstream_st * cudaStream_t
-#   cudaTextureObject_t - [PRIM} typedef unsigned long long cudaTextureObject_t
-#   cudaEvent_t - [PTR} typedef struct CUevent_st* cudaEvent_t
+#   cudaTextureObject_t - [PRIM] typedef unsigned long long cudaTextureObject_t
+#   cudaStream_t - [PTR] typedef CUstream_st * cudaStream_t
+#   cudaEvent_t - [PTR] typedef struct CUevent_st* cudaEvent_t
 ########################################################################
 
 # Optional tags for each argument in a function signature:
@@ -292,18 +292,16 @@ EXTERNC cudaError_t
 cudaDestroyTextureObject(cudaTextureObject_t texObject)
 )
 
-## FIXME: cudaEvent_t is "an opaque value represening a CUDA event
-#    Same questions as for cudaTextureObject_t above.
+## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaEventDestroy (cudaEvent_t event)
+cudaEventDestroy (:IN cudaEvent_t event)
 )
 
-## FIXME: cudaEvent_t is "an opaque value represening a CUDA event
-#    Same questions as for cudaTextureObject_t above.
+## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaEventQuery (cudaEvent_t event)
+cudaEventQuery (:IN cudaEvent_t event)
 )
 
 ## FIXME: This needs custom handling
@@ -335,50 +333,48 @@ EXTERNC cudaError_t
 cudaDeviceSynchronize( void )
 )
 
-## FIXME: Must implement :OUT_DEEPCOPY
-#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
-#    So, we need the :OUT_DEEPCOPY tag (not yet implemented)
-# typedef struct CUevent_st* cudaEvent_t
-## CUDA_WRAPPER(
-## EXTERNC cudaError_t
-## cudaEventCreateWithFlags(:OUT_DEEPCOPY cudaEvent_t* event, unsigned int  flags)
-## )
-
-# typedef struct CUevent_st* cudaEvent_t
-## CUDA_WRAPPER(
-## EXTERNC cudaError_t
-## cudaEventCreate(:OUT_DEEPCOPY cudaEvent_t* event)
-## )
-
-#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
-# typedef struct CUevent_st* cudaEvent_t
+## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaEventDestroy(:IN_DEEPCOPY cudaEvent_t event)
+cudaEventCreateWithFlags(:OUT cudaEvent_t* event, unsigned int flags)
 )
 
-#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
-# typedef struct CUevent_st* cudaEvent_t
+## NOTE:  cudaEvent_t - [PTR] typedef struct CUevent_st* cudaEvent_t
+##  Needs testing.  Presumably, a CUevent_st struct is at a unique
+##   location in proxy host memory, and moving it to a different address
+##   will make bad things happen internally in the CUDA library.
+## Therefore, we use :OUT, to copy only the pointer into the appication process.
+## If it were 'cudaEvent_t event', we would use just :IN (not :IN-DEEPCOPY)
+##   for the same reason.
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaError_t cudaEventSynchronize(:IN_DEEPCOPY cudaEvent_t event)
+cudaEventCreate(:OUT cudaEvent_t* event)
 )
 
+## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaEventElapsedTime (:OUT float* ms, :IN_DEEPCOPY cudaEvent_t start,
-                      :IN_DEEPCOPY cudaEvent_t end)
+cudaEventDestroy(:IN cudaEvent_t event)
 )
 
+## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaError_t cudaEventSynchronize(:IN cudaEvent_t event)
+)
 
+## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaEventElapsedTime (:OUT float* ms, :IN cudaEvent_t start,
+                      :IN cudaEvent_t end)
+)
 
-## FIXME: Must implement :OUT_DEEPCOPY
-#    event is a ptr to event, and so ptr to ptr to struct CUevent_st
-# typedef struct CUevent_st* cudaEvent_t
-# CUDA_WRAPPER(
-# EXTERNC cudaError_t
-# cudaEventRecord(:IN_DEEPCOPY cudaEvent_t event, cudaStream_t stream)
-# )
+## NOTE:  See cudaStreamCreate() for commments on cudaStream_t
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaEventRecord(:IN cudaEvent_t event, :IN cudaStream_t stream)
+)
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
@@ -428,6 +424,7 @@ cudaMallocHost(void** ptr, size_t size ) {
 ## FIXME: typedef CUstream_st * cudaStream_t
 #    This needs custom handling if stream != 0.  In that case,
 #    stream must use :IN_DEEPCOPY
+## NOTE:  See cudaEventCreate() for commments on cudaStream_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMemcpyAsync(:DEST void* dst, :SRC const void* src, :SIZE size_t count,
@@ -436,6 +433,7 @@ cudaMemcpyAsync(:DEST void* dst, :SRC const void* src, :SIZE size_t count,
 ## FIXME: typedef CUstream_st * cudaStream_t
 #    This needs custom handling if stream != 0.  In that case,
 #    stream must use :IN_DEEPCOPY
+## NOTE:  See cudaEventCreate() for commments on cudaStream_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMemsetAsync(:IN void* devPtr, int value, size_t count,
@@ -485,11 +483,14 @@ cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset,
                   :DIRECTION enum cudaMemcpyKind kind)
 )
 
-## FIXME: cudaStream_t is a ptr to CUstream_st
-##        must implement: OUT_DEEPCOPY
+## NOTE:  cudaStream_t - [PTR] typedef CUstream_st * cudaStream_t
+##  Needs testing.  Presumably, a CUstream_st struct is at a unique
+##   location in proxy host memory, and moving it to a different address
+##   will make bad things happen internally in the CUDA library.
+## Therefore, we use :OUT, to copy only the pointer into the appication process.
 CUDA_WRAPPER_WITH_LOGGING(
 EXTERNC cudaError_t
-cudaStreamCreate(:OUT_DEEPCOPY cudaStream_t* pStream)
+cudaStreamCreate(:OUT cudaStream_t* pStream)
 )
 
 CUDA_WRAPPER(
