@@ -50,6 +50,11 @@ copy_data_to_device()
   }
 }
 
+//================================================================
+#ifdef PYTHON_AUTO_GENERATE
+# include "python-auto-generate/cudawrappers.icpp"
+#else
+
 // 1.
 EXTERNC cudaError_t
 cudaMalloc(void **pointer, size_t size)
@@ -454,9 +459,9 @@ cudaSetupArgument(const void *arg, size_t size, size_t offset)
   if (!initialized)
     proxy_initialize();
 
-#if USE_SHM
+# if USE_SHM
   memcpy(shmaddr, arg, size);
-#endif
+# endif
 
   cudaSyscallStructure strce_to_send, rcvd_strce;
   cudaError_t ret_val;
@@ -1318,3 +1323,5 @@ cudaOccupancyMaxActiveBlocksPerMultiprocessor (int *numBlocks, \
 
   return ret_val;
 }
+
+#endif

@@ -47,7 +47,9 @@ CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -c
 
 DEMO_PORT=7781
 
-default: ${LIBNAME}.so
+default:
+	cd python-auto-generate && make
+	make ${LIBNAME}.so
 
 vi:
 	vim cuda-plugin.cpp

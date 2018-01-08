@@ -63,6 +63,7 @@ extern struct sockaddr_un sa_proxy;
 extern bool enableCudaCallLogging;
 #endif // ifndef STANDALONE
 
+#ifndef PYTHON_AUTO_GENERATE
 enum cuda_syscalls
 {
   CudaMalloc,
@@ -427,6 +428,9 @@ typedef struct
   const void *payload;
   size_t payload_size;
 } cudaSyscallStructure;
+#else
+# include "python-auto-generate/cuda_plugin.h"
+#endif
 
 #ifndef STANDALONE
 
@@ -441,10 +445,15 @@ void proxy_initialize(void);
 void copy_data_to_host(void);
 void copy_data_to_device(void);
 
+#ifndef PYTHON_AUTO_GENERATE
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
 void log_append(cudaSyscallStructure record);
 bool log_read(cudaSyscallStructure *record);
+#else
+void log_append(void *ptr, size_t size);
+void * log_read(size_t *size);
+#endif
 
 void disable_cuda_call_logging();
 void enable_cuda_call_logging();
