@@ -123,7 +123,7 @@ cudaPointerGetAttributes(:OUT cudaPointerAttributes *attributes,
 # Required by cudaMemcpy and friends
 CUDA_VERBATIM_WRAPPER(
 EXTERNC static enum cudaMemcpyKind
-cudaMemcpyGetDirection(void *destPtr, void *srcPtr,
+cudaMemcpyGetDirection(const void *destPtr, const void *srcPtr,
                        enum cudaMemcpyKind *direction) {
   cudaPointerAttributes destPtrAttr;
   cudaPointerAttributes srcPtrAttr;
@@ -132,21 +132,20 @@ cudaMemcpyGetDirection(void *destPtr, void *srcPtr,
   JASSERT(cudaPointerGetAttributes(&srcPtrAttr, srcPtr) == cudaSuccess)
                                    .Text("Error getting pointer properties");
   if (destPtrAttr.memoryType == cudaMemoryTypeHost &&
-      srcPtr.memoryType == cudaMemoryTypeHost) {
+      srcPtrAttr.memoryType == cudaMemoryTypeHost) {
     *direction = cudaMemcpyHostToHost;
   } else if (destPtrAttr.memoryType == cudaMemoryTypeHost &&
-             srcPtr.memoryType == cudaMemoryTypeDevice) {
+             srcPtrAttr.memoryType == cudaMemoryTypeDevice) {
     *direction = cudaMemcpyDeviceToHost;
   } else if (destPtrAttr.memoryType == cudaMemoryTypeDevice &&
-             srcPtr.memoryType == cudaMemoryTypeHost) {
+             srcPtrAttr.memoryType == cudaMemoryTypeHost) {
     *direction = cudaMemcpyHostToDevice;
   } else if (destPtrAttr.memoryType == cudaMemoryTypeDevice &&
-             srcPtr.memoryType == cudaMemoryTypeDevice) {
+             srcPtrAttr.memoryType == cudaMemoryTypeDevice) {
     *direction = cudaMemcpyDeviceToDevice;
   } else {
     JASSERT(false).Text("DMTCP/CUDA internal error");
   }
-  return cudaSuccess;
 }
 )
 
