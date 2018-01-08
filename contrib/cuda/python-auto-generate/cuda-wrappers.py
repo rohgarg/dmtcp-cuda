@@ -266,7 +266,7 @@ def cudaMemcpyExtraCode(args, isLogging):
       direction == cudaMemcpyHostToHost) {
     // Receive source buffer from application process
     %s = malloc(size);
-    JASSERT(read(skt_master, %s, size) == size) (JASSERT_ERRNO);
+    assert(read(skt_accept, %s, size) == size);
     // Get ready for receiving memory from device when making CUDA call
     %s
     // NEEDED FOR DeviceToHost; SHOULD REUSE OLD malloc() for HostToHost
@@ -282,7 +282,7 @@ def cudaMemcpyExtraCode(args, isLogging):
     // Send  dest buffer to application process
     // NOTE:  This assumes no pinnned memory.
     free(%s);
-    JASSERT(write(skt_master, %s, size) == size) (JASSERT_ERRNO);
+    assert(write(skt_accept, %s, size) == size);
     free(%s);
   }
 """ % (args_dict["SRC"], args_dict["DEST"], args_dict["DEST"]))
@@ -343,6 +343,7 @@ cuda_include_head = (
 #include "jassert.h"
 
 extern int skt_master;
+extern int skt_accept;
 extern int initialized;
 
 void proxy_initialize();
@@ -374,10 +375,10 @@ int main() {
 }
 
 void do_work() {
-  while(true) {
+  while(1) {
     enum cuda_op op;
 
-    assert(read(skt_master, &op, sizeof op) == sizeof op);
+    assert(read(skt_accept, &op, sizeof op) == sizeof op);
     switch (op) {
 """)
 cudaproxy.write(cudaproxy_head)
@@ -551,9 +552,9 @@ def write_cuda_bodies(fnc, args):
   (
 """  // Compute total chars_rcvd to be read in the next msg
   chars_rcvd = """ + args_in_sizeof + """;
-  assert(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd);"""
+  assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);"""
   if len(args_in_sizeof) > 0
-  else "  // No primitive args to receive.  Will not read from skt_master.") +
+  else "  // No primitive args to receive.  Will not read from skt_accept.") +
 """
   chars_rcvd = 0;
 """)
@@ -612,7 +613,7 @@ def write_cuda_bodies(fnc, args):
                         "  chars_sent += %s;\n") % (var, size, size))
   cudaproxy2.write("  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);\n")
   cudaproxy2.write(
-"""  assert(write(skt_master, send_buf, chars_sent) == chars_sent);
+"""  assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
 """)
   # This occurs after we send to the application process, because
   #   application_after is not using the send_buf.  It does its own send, since
