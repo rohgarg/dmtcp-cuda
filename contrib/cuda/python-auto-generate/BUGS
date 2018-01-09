@@ -59,6 +59,10 @@ LOOK UP HANDLING FOR:
   ...Async...
 
 ====================================
+FIXED (as of Mon.., Jan. 8):
+  "EXTERNC" was appearing in body of functions; fixed
+  main.template had repeated "cudaError_t" for function type, and  missing ')'
+
 FIXED (as of Sat.., Jan. 6):
   cudaMemcpy2D implemented
   CUDA_WRAPPER_WITH_LOGGING implemented

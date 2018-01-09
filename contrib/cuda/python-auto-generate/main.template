@@ -446,8 +446,6 @@ EXTERNC cudaError_t
 cudaFuncSetCacheConfig (const void* func, cudaFuncCache cacheConfig)
 )
 
-## FIXME: the return value type is not "cudaError_t", it's "const char*"
-##        should this be handled as a special case?		
 CUDA_WRAPPER(
 EXTERNC const char*
 cudaGetErrorString(cudaError_t error)
