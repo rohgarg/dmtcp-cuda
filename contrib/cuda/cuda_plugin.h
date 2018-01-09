@@ -449,6 +449,9 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
 void log_append(cudaSyscallStructure record);
 bool log_read(cudaSyscallStructure *record);
 #else
+// Just for testing purpose. Otherwise this function is obsolete.
+void send_recv(int fd, cudaSyscallStructure *strce_to_send,
+              cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
 void log_append(void *ptr, size_t size);
 void * log_read(size_t *size);
 #endif

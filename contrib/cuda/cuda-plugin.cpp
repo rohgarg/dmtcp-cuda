@@ -80,28 +80,36 @@ restart()
     exit(EXIT_FAILURE);
   }
   disable_cuda_call_logging();
-  cudaSyscallStructure rec;
-  memset(&rec, 0, sizeof(rec));
+
   // Replay calls from the log
-  bool ret = log_read(&rec);
-  while (ret) {
-    // TODO: Add cases for other calls
-    if (rec.op == CudaMalloc) {
-      cudaMalloc((void**)rec.syscall_type.cuda_malloc.pointer,
-                 rec.syscall_type.cuda_malloc.size);
-    }
-    else if (rec.op == CudaMallocManaged) {
-      cudaMallocManaged((void**)rec.syscall_type.cuda_malloc.pointer,
-                        rec.syscall_type.cuda_malloc.size);
-    }
-    else if (rec.op == CudaMallocPitch) {
-      cudaMallocPitch((void**)rec.syscall_type.cuda_malloc_pitch.devPtr, \
-                              rec.syscall_type.cuda_malloc_pitch.pitchp, \
-                              rec.syscall_type.cuda_malloc_pitch.width,  \
-                              rec.syscall_type.cuda_malloc_pitch.height);
+  void *log_read_buf;
+  size_t buf_size;
+  enum cuda_op op;
+  log_read_buf = log_read(&buf_size);
+  memcpy(&op, log_read_buf, sizeof(op));
+
+  while (op != OP_LAST_FNC) {
+    // TODO: Add cases for other calls that should be replayed.
+    if (op == OP_cudaMalloc) {
+      // read size. "size" as in cudaMalloc(void **ptr, "size")
+      size_t size;
+      memcpy(&size, log_read_buf+sizeof(op), sizeof(size));
+      /*
+      The assumption is that when cudaMalloc is replayed the same
+      virtual address will be returned. If that is the case then
+      the application can safely use the same virtual address
+      on restart so long as the call has been replayed.
+      */
+
+      /*
+      "ptr" is not used anywhere, it is solely for reply purpose.
+      */
+      void *ptr;
+      cudaMalloc(&ptr, size);
     }
 
-    ret = log_read(&rec);
+    log_read_buf = log_read(&buf_size);
+    memcpy(&op, log_read_buf, sizeof(op));
   }
   copy_data_to_device();
   enable_cuda_call_logging();

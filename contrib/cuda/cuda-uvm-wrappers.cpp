@@ -47,7 +47,15 @@ cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
     strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
     strce_to_send.syscall_type.cuda_malloc.size = size;
 
-    log_append(strce_to_send);
+
+    /*
+    In the current design the below signature should be used.
+    void log_append(void *ptr, size_t size);
+    for debugging and testing purposes I'm using dummy agrs for now.
+    */
+    char buf[1000];
+    size_t size = 128;
+    log_append((void *)buf, size);
   }
 
   return ret_val;

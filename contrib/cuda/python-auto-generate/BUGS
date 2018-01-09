@@ -90,3 +90,34 @@ Don't return ret_val from FNC_XXX since it has void return value.
 Return type added:  void FNC_XXX
 New line after '}' end of fnc
 Function of no arguments now specifices 'void':  void FNC_XXX(void);
+
+
+Ones' comments:
+  Bugs found
+====================================
+- dmtcp-cuda/contrib/cuda/cuda-plugin.cpp +86
+In the current version we are nolonger using the cudaSyscallsStructure
+we are instead using a fixed size buffer to hold the args we want
+to send and/or receive.
+The restart() function in cuda-plugin.cpp seems to be using the
+obselete version of log_read().
+FIXED (as of Tues., Jan 9):
+
+- dmtcp-cuda/contrib/cuda/cuda-uvm-utils.cpp +82
+The UVM implementation is not up-to-date with the current design.
+It is still using "send_recv()".
+For testing purpose, I am copying "send_recv()" in the scope of
+python-auto-generate code.
+FIXED (not yet: after UVM implementation)
+
+- log_append() in cudaMallocManaged()
+UVM is still following the obsolete design.
+For now, I will used dummy args in log_append.
+FIXED (not yet: during UVM implementation)
+
+- dmtcp-cuda/contrib/cuda/python-autogenerate/cudaproxy.icpp
+inside FNC_cudaMemcpyToArray():
+dst = malloc() should insted be dst = (cudaArray_t) malloc().
+I fixed this in the source code but the script should also
+be updated.
+FIXED (not yet: to be done by Gene)
