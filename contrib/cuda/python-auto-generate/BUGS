@@ -60,6 +60,8 @@ LOOK UP HANDLING FOR:
 
 ====================================
 FIXED (as of Sat.., Jan. 6):
+  cudaMemcpy2D implemented
+  CUDA_WRAPPER_WITH_LOGGING implemented
   Ignore default optional args for fnc's such as
      cudaMallocArray and cudaMemcpyAsync
 

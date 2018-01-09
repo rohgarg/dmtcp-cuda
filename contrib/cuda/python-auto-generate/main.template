@@ -58,7 +58,7 @@
 #                               :SRC_PITCH size_t spitch,
 #                               size_t width, :HEIGHT size_t height,
 #                              :DIRECTION enum cudaMemcpyKind kind)
-#        
+#
 # TODO:
 # cudaBindTexture2D - offset arg is :OUT_OPT because the ptr
 #       might be NULL on input
@@ -82,12 +82,12 @@
 #  cudaMalloc() and cudaMallocHost() and cudaHostAlloc()
 #    and cudaMallocManaged() and cudaMalloc*() and
 #    cudaFree() and cudaFreeHost and cudaFreeAray
-# 
+#
 # Another potential tag is :INOUT - pointer points to base memmory,
 #       and the memory is valid on input, and replaced on output
 #   We must re-use the input memory on output
 # EXAMPLE: cudaGetDeviceProperties(:INOUT cudaDeviceProp* prop, int device)
-# 
+#
 #===========================
 # TOP-LEVEL STATEMENTS:
 # CUDA_WRAPPER(...) -- uses function signature with tags described above
@@ -96,7 +96,7 @@
 #
 # CUDA_VERBATIM_WRAPPER(...) -- inserts code directly into cudawrapper.icc
 #   For technical reasons, comments in the code are not currently preserved.
-#                               
+#
 # CUDA_VERBATIM_PROXY(...) -- inserts code directly into cudaproxy.icc
 #   For technical reasons, comments in the code are not currently preserved.
 
@@ -122,7 +122,7 @@ cudaPointerGetAttributes(:OUT cudaPointerAttributes *attributes,
 
 # Required by cudaMemcpy and friends
 CUDA_VERBATIM_WRAPPER(
-EXTERNC static enum cudaMemcpyKind
+EXTERNC enum cudaMemcpyKind
 cudaMemcpyGetDirection(const void *destPtr, const void *srcPtr,
                        enum cudaMemcpyKind *direction) {
   cudaPointerAttributes destPtrAttr;
@@ -342,7 +342,7 @@ cudaEventDestroy(:IN cudaEvent_t event)
 ## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaError_t cudaEventSynchronize(:IN cudaEvent_t event)
+cudaEventSynchronize(:IN cudaEvent_t event)
 )
 
 ## NOTE:  See cudaEventCreate() for commments on cudaEvent_t
@@ -411,6 +411,7 @@ CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMemcpyAsync(:DEST void* dst, :SRC const void* src, :SIZE size_t count,
                 :DIRECTION cudaMemcpyKind kind, cudaStream_t stream = 0)
+)
 
 ## FIXME: typedef CUstream_st * cudaStream_t
 #    This needs custom handling if stream != 0.  In that case,
@@ -438,7 +439,7 @@ EXTERNC cudaChannelFormatDesc
 cudaCreateChannelDesc(int x, int y, int z, int w, cudaChannelFormatKind f)
 )
 
-## FIXME: func ptr is valid in the proxy address space as well. 
+## FIXME: func ptr is valid in the proxy address space as well.
 ##        should this be handled as a special case?
 CUDA_WRAPPER(
 EXTERNC cudaError_t
