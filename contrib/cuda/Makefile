@@ -47,9 +47,10 @@ CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -c
 
 DEMO_PORT=7781
 
-default:
+default: auto-generate ${LIBNAME}.so
+
+auto-generate:
 	cd python-auto-generate && make
-	make ${LIBNAME}.so
 
 vi:
 	vim cuda-plugin.cpp
@@ -128,7 +129,7 @@ restart:
 
 check: ${LIBNAME}.so cudaproxy test/test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
-	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} -i 5 \
+	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} \
 	  --with-plugin $$PWD/${LIBNAME}.so test/test1
 
 # We link the library using C++ for compatibility with the main libdmtcp.so
