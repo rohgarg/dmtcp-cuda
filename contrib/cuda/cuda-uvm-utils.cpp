@@ -61,6 +61,50 @@ allShadowRegions()
   return *instance;
 }
 
+/* This works for both userfaultfd-based and segfault handler-based implementations.
+ *
+ * In the case of the former, it adds the shadow page to the UFFD managed regions.
+ *
+ * In the case of the latter, it does nothing, except adding the shadow page to
+ * the list of all shadow page regions. This list is used later to flush dirty pages
+ * to the proxy and receiving data from the proxy.
+ */
+static void
+monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
+{
+#ifdef USERFAULTFD
+  struct uffdio_register uffdio_register;
+
+  uffdio_register.range.start = (uintptr_t)addr;
+  uffdio_register.range.len = size;
+  uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
+#endif
+
+  JNOTE("register region")(addr)(size);
+
+#ifdef USERFAULTFD
+  JASSERT(ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) != -1)(JASSERT_ERRNO);
+#endif
+
+  if (remoteInfo) {
+    // Save the location and size of the shadow region
+    for (int i = 0; i < size / page_size; i++) {
+      ShadowRegion r =  {.addr = (void*)((uintptr_t)addr + i*page_size),
+                         .len = size,
+                         .dirty = false};
+      allShadowRegions().push_back(r);
+      // Save the actual UVM region on the proxy
+      shadowPageMap()[addr] = (void*)((uintptr_t)remoteInfo->
+                                      syscall_type.cuda_malloc.pointer +
+                                      i * page_size);
+    }
+  }
+}
+
+/*
+ * This gets called at a synchronization point by flushDirtyPages() to send
+ * to the proxy process.
+ */
 static bool
 sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 {
@@ -84,6 +128,11 @@ sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
           .Text("Failed to send UVM dirty pages");
 }
 
+/*
+ * This gets called on a read fault to read in the updated data from
+ * the proxy. The data is copied into the local buffer that generated
+ * the segfault.
+ */
 static bool
 receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 {
@@ -116,6 +165,11 @@ receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
           (JASSERT_ERRNO);
 }
 
+/*
+ * This gets called on a write fault. The shadow region containing the faulting
+ * page is marked as dirty. The dirty pages are flushed later at a synchronization
+ * point (see flushDirtyPages).
+ */
 static void
 markDirtyRegion(void *page)
 {
@@ -129,6 +183,10 @@ markDirtyRegion(void *page)
   }
 }
 
+/* NOTE: This function sends all the dirty pages to the proxy process. This
+ * gets called at a "synchronization point", for example, on a call to
+ * cudaLaunchKernel.
+ */
 void
 flushDirtyPages()
 {
@@ -144,6 +202,10 @@ flushDirtyPages()
       //       unregisters the page.
 #ifdef USERFAULTFD
       reregister_page(it->addr, it->len);
+#else
+      // Reset the permissions on the pages.
+      JASSERT(mprotect(it->addr, it->len, PROT_NONE) == 0)
+             (JASSERT_ERRNO)(it->addr).Text("Could not reset perms on page");
 #endif
       it->dirty = false;
     }
@@ -160,13 +222,19 @@ create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
 {
   int npages = size / page_size + 1;
   void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
+#ifdef USERFAULTFD
   void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+#else
+  // Ideally, we should start with PROT_WRITE, but PROT_WRITE also gives the
+  // page read permissions. So, for safety and simplicity, we start with
+  // PROT_NONE.
+  void *addr = mmap(remoteAddr, npages * page_size, PROT_NONE, // | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+#endif
 
   JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-#ifdef USERFAULTFD
   monitor_pages(addr, npages * page_size, remoteInfo);
-#endif
   return addr;
 }
 
@@ -266,31 +334,6 @@ fault_handler_thread(void *arg)
   }
 }
 
-static void
-monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
-{
-  struct uffdio_register uffdio_register;
-
-  uffdio_register.range.start = (uintptr_t)addr;
-  uffdio_register.range.len = size;
-  uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
-
-  JNOTE("register region")(addr)(size);
-
-  JASSERT(ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) != -1)(JASSERT_ERRNO);
-
-  if (remoteInfo) {
-    // Save the location and size of the shadow region
-    for (int i = 0; i < size / page_size; i++) {
-      ShadowRegion r =  {.addr = addr + i * page_size,
-                         .len = size, .dirty = false};
-      allShadowRegions().push_back(r);
-      // Save the actual UVM region on the proxy
-      shadowPageMap()[addr] = remoteInfo->syscall_type.cuda_malloc.pointer +
-                              i * page_size;
-    }
-  }
-}
 
 static void
 reregister_page(void *addr, size_t len)
@@ -459,8 +502,8 @@ segvfault_initialize(void)
 
   page_size = sysconf(_SC_PAGE_SIZE);
   // We need SHIFT inside segvfault_handler()
-  for (SHIFT = 0; (1<<SHIFT) < page_size; SHIFT++) ;
-  JASSERT(1<<SHIFT == page_size);
+  for (SHIFT = 0; (1 << SHIFT) < page_size; SHIFT++) ;
+  JASSERT(1 << SHIFT == page_size);
 
   // first install a PAGE FAULT handler: using sigaction
   static struct sigaction action;
@@ -469,22 +512,23 @@ segvfault_initialize(void)
   action.sa_sigaction = segvfault_handler;
   sigemptyset(&action.sa_mask);
 
-  if (sigaction(SIGSEGV, &action, NULL) == -1){
-    perror("sigaction");
-    exit(1);
-  }
+  JASSERT(sigaction(SIGSEGV, &action, NULL) != -1)
+         (JASSERT_ERRNO).Text("Could not set up the segfault handler");
 
   segvfault_initialized = True;
 }
 
-void segvfault_handler(int signum, siginfo_t *siginfo, void *context){
-  // get which address segfaulted 
+void
+segvfault_handler(int signum, siginfo_t *siginfo, void *context)
+{
+  static int fault_cnt = 0;     /* Number of faults so far handled */
+  // get which address segfaulted
   void *addr = (void *) siginfo->si_addr;
   if (addr == NULL){
-    perror("segvfault_handler");
-    exit(1);
+    JASSERT(false).Text("NULL address for segfault");
   }
   void *page_addr = (void *)(((long long unsigned)addr >> SHIFT) << SHIFT);
+  void *faultingPage = getAlignedAddress((uintptr_t)addr, page_size);
 
   // Find out if this is a write fault.  (Otherwise, it's a read fault.)
   JASSERT(siginfo->si_code == SEGV_ACCERR);
@@ -493,47 +537,60 @@ void segvfault_handler(int signum, siginfo_t *siginfo, void *context){
   // FIXME:  On StackOverflow, there seem to be contradictory answers
   //   on whether we want the negation or not, below:
   //   https://stackoverflow.com/questions/17671869/how-to-identify-read-or-write-operations-of-page-fault-when-using-sigaction-hand
-  bool is_write_fault = !(err & 0x2);
-
-// FIXME:  Add: enum application_state: READ, WRITE, CUDA_CALL.
-//   Then add logic:   if (is_write_fault && application_state != WRITE) ...;
-//   and so on.
-
-  // change the permission in the corresponding mem region.
+  // bool is_write_fault = !(err & 0x2);
+  // XXX: Rohan: It seems like for write faults, we don't need the negation
+  bool is_write_fault = (err & 0x2);
 
   // make sure the page is mapped.
-  int prot = PROT_NONE;
-// FIXME:
-//   For now, I am giving all permissions.  We need to examine
-//   the state ("read", "write", or "CUDA call"), and give permission
-//   only acccording to the required state.
-  int flags = MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS;  
-  if (mmap(addr, page_size, prot, flags, -1, 0) == (void *)-1) {
-    perror("mmap"); 
-    exit(1);
-  }
-// FIXME (see above)
-  if (mprotect(addr, page_size, PROT_WRITE|PROT_READ|PROT_EXEC) == -1){
-    perror("mprotect");
-    exit(1);
-  }
+  // int prot = PROT_NONE;
+  // FIXME:
+  //   For now, I am giving all permissions.  We need to examine
+  //   the state ("read", "write", or "CUDA call"), and give permission
+  //   only acccording to the required state.
+  // int flags = MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS;
+  // if (mmap(page_addr, page_size, prot, flags, -1, 0) == (void *)-1) {
+  //   perror("mmap");
+  //   exit(1);
+  // }
 
-//  if (write(skt_live_migrate, &addr, sizeof(addr)) == -1){
-//    perror("write");
-//    exit(1);
-//  }
-  //-- receive the page -- 
-  // read data in memory
+  // FIXME:  Add: enum application_state: READ, WRITE, CUDA_CALL.
+  //   Then add logic:   if (is_write_fault && application_state != WRITE) ...;
+  //   and so on.
+
+  if (is_write_fault) {
+    // We mark the region as dirty for flushing at a later sync point
+    markDirtyRegion(faultingPage);
+    // change the permission in the corresponding mem region.
+    // FIXME (see above)
+
+    // NOTE: WRITE permissions also gives READ permissions. So, there could
+    // be an issue where an application writes and then reads, for example, in
+    // case of an application that writes to a page and then waits for an
+    // already running kernel to update the page.
+    JASSERT(mprotect(faultingPage, page_size, PROT_WRITE) == 0)
+           (JASSERT_ERRNO)(addr).Text("Could not add write perms to the page");
+  } else {
+    // change the permission in the corresponding mem region.
+    // FIXME (see above)
+    // XXX: Temporarily give write permissions to read in data from the proxy
+    JASSERT(mprotect(faultingPage, page_size, PROT_READ | PROT_WRITE) == 0)
+           (JASSERT_ERRNO)(addr).Text("Could not add read perms to the page");
+    receiveDataFromProxy(faultingPage, page_addr, page_size);
+    // XXX: Remove the WRITE permissions
+    JASSERT(mprotect(faultingPage, page_size, PROT_READ) == 0);
+  }
+  fault_cnt++;
+
   JTRACE("    SEGV page fault: ")
         (addr)(page_addr)(page_size);
 
-// FIXME:  Need to copy from UVM page to shadow page.  Change one of page_addr
+  // FIXME:  Need to copy from UVM page to shadow page.  Change one of page_addr
   // Copy second argument from proxy process into this application process
-  receiveDataFromProxy(page_addr, page_addr, page_size);
-//  if (read(skt_live_migrate, addr, page_size) == -1){
-//    perror("read");
-//    exit(1);
-//  }
+  // receiveDataFromProxy(page_addr, page_addr, page_size);
+  //  if (read(skt_live_migrate, addr, page_size) == -1){
+  //    perror("read");
+  //    exit(1);
+  //  }
   // the execution continues where it segfaulted, it
   // reexecutes the same instruction but it won't segfault this time.
 }
