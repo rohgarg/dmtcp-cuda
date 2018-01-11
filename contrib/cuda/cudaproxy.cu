@@ -114,6 +114,7 @@ static int start_proxy(void)
 
   // do_work() has an infinite 'while(1)' loop.
   // do_work(); // never returns
+  return 0;
 }
 
 
@@ -158,6 +159,9 @@ void do_work() {
       break;
     case OP_cudaSetupArgument:
       FNC_cudaSetupArgument();
+      break;
+    case OP_cudaLaunch:
+      FNC_cudaLaunch();
       break;
     case OP_cudaThreadSynchronize:
       FNC_cudaThreadSynchronize();
@@ -350,7 +354,6 @@ void FNC_cudaMemcpy(void) {
   enum cudaMemcpyKind direction;
 
   char recv_buf[100];
-  char send_buf[100];
   int chars_rcvd = 0;
   int chars_sent = 0;
 
@@ -535,7 +538,6 @@ void FNC_cudaConfigureCall(void) {
   cudaStream_t stream;
 
   char recv_buf[100];
-  char send_buf[100];
   int chars_rcvd = 0;
   int chars_sent = 0;
 
@@ -595,7 +597,6 @@ void FNC_cudaLaunch(void) {
   void * func;
 
   char recv_buf[100];
-  char send_buf[100];
   int chars_rcvd = 0;
   int chars_sent = 0;
 
@@ -617,14 +618,11 @@ void FNC_cudaLaunch(void) {
 
 void FNC_cudaThreadSynchronize(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaThreadSynchronize();
@@ -636,14 +634,11 @@ void FNC_cudaThreadSynchronize(void) {
 
 void FNC_cudaGetLastError(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaGetLastError();
@@ -694,14 +689,11 @@ void FNC_cudaMallocPitch(void) {
 
 void FNC_cudaDeviceReset(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaDeviceReset();
@@ -750,14 +742,11 @@ void FNC_cudaCreateTextureObject(void) {
 
 void FNC_cudaPeekAtLastError(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaPeekAtLastError();
@@ -769,14 +758,11 @@ void FNC_cudaPeekAtLastError(void) {
 
 void FNC_cudaProfilerStart(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaProfilerStart();
@@ -788,14 +774,11 @@ void FNC_cudaProfilerStart(void) {
 
 void FNC_cudaProfilerStop(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaProfilerStop();
@@ -1019,14 +1002,11 @@ void FNC_cudaDeviceSetSharedMemConfig(void) {
 
 void FNC_cudaDeviceSynchronize(void) {
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Make the function call
   cudaError_t ret_val = cudaDeviceSynchronize();
@@ -1070,14 +1050,11 @@ void FNC_cudaEventCreateWithFlags(void) {
 void FNC_cudaEventCreate(void) {
   cudaEvent_t * event;
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Declare base variables for OUT arguments to point to
   cudaEvent_t base_event;
@@ -1236,14 +1213,11 @@ void FNC_cudaFuncGetAttributes(void) {
 void FNC_cudaGetDevice(void) {
   int * device;
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Declare base variables for OUT arguments to point to
   int base_device;
@@ -1262,14 +1236,11 @@ void FNC_cudaGetDevice(void) {
 void FNC_cudaGetDeviceCount(void) {
   int * count;
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Declare base variables for OUT arguments to point to
   int base_count;
@@ -1591,14 +1562,11 @@ void FNC_cudaMemGetInfo(void) {
   size_t * free;
   size_t * total;
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Declare base variables for OUT arguments to point to
   size_t base_free;
@@ -1680,14 +1648,11 @@ void FNC_cudaMemcpyToArray(void) {
 void FNC_cudaStreamCreate(void) {
   cudaStream_t * pStream;
 
-  char recv_buf[100];
   char send_buf[100];
-  int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // No primitive args to receive.  Will not read from skt_accept.
-  chars_rcvd = 0;
 
   // Declare base variables for OUT arguments to point to
   cudaStream_t base_pStream;
