@@ -592,11 +592,18 @@ def write_cuda_bodies(fnc, args):
   cudaproxy2.write("void FNC_" + fnc["name"] + "(void) {\n")
   cudaproxy2.write(fnc_args.replace("const ", "") + "\n")
   cudaproxy2.write(
-"""  char recv_buf[100];
-  char send_buf[100];
-  int chars_rcvd = 0;
+"""  char send_buf[1000];
   int chars_sent = 0;
 """)
+  def some_incoming_args(args):
+    return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
+  if some_incoming_args(args):
+    cudaproxy2.write(
+"""  char recv_buf[1000];
+  int chars_rcvd = 0;
+
+""")
+
   args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
                                              if arg["tag"][0] in in_style_tags]
   args_in_sizeof += [" + sizeof *" + arg["name"] for arg in args
@@ -613,12 +620,12 @@ def write_cuda_bodies(fnc, args):
 """  // Compute total chars_rcvd to be read in the next msg
   chars_rcvd = """ + args_in_sizeof + """;
   assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
-  // Now read the data for the total chars_rcvd"""
-  if len(args_in_sizeof) > 0
-  else "  // No primitive args to receive.  Will not read from skt_accept.") +
-"""
+  // Now read the data for the total chars_rcvd
   chars_rcvd = 0;
-""")
+"""
+  if len(args_in_sizeof) > 0
+  else "  // No primitive args to receive.  Will not read from skt_accept.\n")
+)
   for arg in args:
     if arg["tag"][0] in in_style_tags:  # if copy-by-value parameter
       (var, size) = (arg["name"], "sizeof " + arg["name"])
