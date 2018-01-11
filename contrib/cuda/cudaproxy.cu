@@ -135,6 +135,9 @@ void do_work() {
     case OP_cudaMalloc:
       FNC_cudaMalloc();
       break;
+    case OP_cudaFree:
+      FNC_cudaFree();
+      break;
     case OP_cudaPointerGetAttributes:
       FNC_cudaPointerGetAttributes();
       break;
@@ -1702,17 +1705,38 @@ void FNC_cudaStreamCreate(void) {
 
 void FNC_cudaThreadExit(void) {
 
+  char send_buf[100];
+  int chars_sent = 0;
+
+  // Receive the arguments
+  // No primitive args to receive.  Will not read from skt_accept.
+
+  // Make the function call
+  cudaError_t ret_val = cudaThreadExit();
+
+  // Write back the arguments to the application
+  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
+  assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
+};
+
+void FNC_cudaFree(void) {
+  void * pointer;
+
   char recv_buf[100];
   char send_buf[100];
   int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
-  // No primitive args to receive.  Will not read from skt_accept.
+  // Compute total chars_rcvd to be read in the next msg
+  chars_rcvd = sizeof pointer;
+  assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
   chars_rcvd = 0;
+  memcpy(&pointer, recv_buf + chars_rcvd, sizeof pointer);
+  chars_rcvd += sizeof pointer;
 
   // Make the function call
-  cudaError_t ret_val = cudaThreadExit();
+  cudaError_t ret_val = cudaFree(pointer);
 
   // Write back the arguments to the application
   memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);

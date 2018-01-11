@@ -104,6 +104,7 @@ void flushDirtyPages();
 
 enum cuda_op {
   OP_cudaMalloc,
+  OP_cudaFree,
   OP_cudaPointerGetAttributes,
   OP_cudaMemcpy,
   OP_cudaMemcpy2D,
@@ -155,6 +156,7 @@ enum cuda_op {
 };
 
 void FNC_cudaMalloc(void);
+void FNC_cudaFree(void);
 void FNC_cudaPointerGetAttributes(void);
 void FNC_cudaMemcpy(void);
 void FNC_cudaMemcpy2D(void);

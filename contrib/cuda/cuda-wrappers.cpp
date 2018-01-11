@@ -1880,3 +1880,34 @@ EXTERNC cudaError_t cudaMallocHost ( void * * ptr , size_t size )
 {* ptr = malloc ( size );
 return cudaSuccess;
 };
+
+EXTERNC cudaError_t
+cudaFree(void * pointer)
+{
+  if (!initialized)
+    proxy_initialize();
+
+  cudaError_t ret_val;
+  char send_buf[1000];
+  char recv_buf[1000];
+  int chars_sent = 0;
+  int chars_rcvd = 0;
+
+  // Write the IN arguments to the proxy
+  enum cuda_op op = OP_cudaFree;
+  memcpy(send_buf + chars_sent, &op, sizeof op);
+  chars_sent += sizeof(enum cuda_op);
+  memcpy(send_buf + chars_sent, & pointer, sizeof pointer);
+  chars_sent += sizeof pointer;
+
+  // Send op code and args to proxy
+  JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
+         (JASSERT_ERRNO);
+
+  // Receive the OUT arguments after the proxy made the function call
+  // No primitive arguments to receive.  Will not read args from skt_master.
+
+  memcpy(&ret_val, recv_buf + chars_rcvd, sizeof ret_val);
+
+  return ret_val;
+}
