@@ -227,17 +227,17 @@ def cudaMemcpyExtraCode(args, isLogging):
   if not args_dict["DIRECTION"]:
     return (application_before, application_after, proxy_before, proxy_after)
 
-  assert args_dict["DIRECTION"] != "direction"  # Check no name clash
+  assert args_dict["DIRECTION"] != "_direction"  # Check no name clash
   application_before += (
-"""  enum cudaMemcpyKind direction;
+"""  enum cudaMemcpyKind _direction;
 """)
   proxy_before += (
-"""  enum cudaMemcpyKind direction;
+"""  enum cudaMemcpyKind _direction;
 """)
 
   application_before += (
 """  if (%s == cudaMemcpyDefault) {
-    cudaMemcpyGetDirection(%s, %s, &direction);
+    cudaMemcpyGetDirection(%s, %s, &_direction);
   }
 """ % (args_dict["DIRECTION"], args_dict["DEST"], args_dict["SRC"]))
 
@@ -269,9 +269,9 @@ def cudaMemcpyExtraCode(args, isLogging):
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
     application_before += (
 """  %s
-  direction = %s;
-  if (direction == cudaMemcpyHostToDevice ||
-      direction == cudaMemcpyHostToHost) {
+  _direction = %s;
+  if (_direction == cudaMemcpyHostToDevice ||
+      _direction == cudaMemcpyHostToHost) {
     // Send source buffer to proxy process
     // NOTE: As an optimization, HostToHost could be done locally.
     // NOTE:  This assumes no pinnned memory.
@@ -293,9 +293,9 @@ def cudaMemcpyExtraCode(args, isLogging):
     proxy_before += (
 """  int _size = -1;
   %s
-  direction = %s;
-  if (direction == cudaMemcpyHostToDevice ||
-      direction == cudaMemcpyHostToHost) {
+  _direction = %s;
+  if (_direction == cudaMemcpyHostToDevice ||
+      _direction == cudaMemcpyHostToHost) {
     // Receive source buffer from application process
     %s = malloc(_size);
     assert(read(skt_accept, %s, _size) == _size);
@@ -311,16 +311,16 @@ def cudaMemcpyExtraCode(args, isLogging):
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
     if direction_declared:
       proxy_after += (
-"""  direction = %s;
+"""  _direction = %s;
 """ % args_dict["DIRECTION"])
     else:
       proxy_after += (
-"""  direction = %s;
+"""  _direction = %s;
 """ % args_dict["DIRECTION"])
 
     proxy_after += (
-"""  if (direction == cudaMemcpyDeviceToHost ||
-      direction == cudaMemcpyHostToHost) {
+"""  if (_direction == cudaMemcpyDeviceToHost ||
+      _direction == cudaMemcpyHostToHost) {
     // Send  dest buffer to application process
     // NOTE:  This assumes no pinnned memory.
     free(%s);
@@ -333,9 +333,9 @@ def cudaMemcpyExtraCode(args, isLogging):
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
     application_after += (
 """  %s
-  direction = %s;
-  if (direction == cudaMemcpyDeviceToHost ||
-      direction == cudaMemcpyHostToHost) {
+  _direction = %s;
+  if (_direction == cudaMemcpyDeviceToHost ||
+      _direction == cudaMemcpyHostToHost) {
     // Receive dest buffer from proxy process
     // NOTE:  This assumes no pinnned memory.
     JASSERT(read(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
