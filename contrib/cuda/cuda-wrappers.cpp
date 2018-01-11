@@ -385,12 +385,12 @@ cudaSetupArgument(const void * arg, size_t size, size_t offset)
   enum cuda_op op = OP_cudaSetupArgument;
   memcpy(send_buf + chars_sent, &op, sizeof op);
   chars_sent += sizeof(enum cuda_op);
-  memcpy(send_buf + chars_sent, & arg, sizeof arg);
-  chars_sent += sizeof arg;
   memcpy(send_buf + chars_sent, & size, sizeof size);
   chars_sent += sizeof size;
   memcpy(send_buf + chars_sent, & offset, sizeof offset);
   chars_sent += sizeof offset;
+  memcpy(send_buf + chars_sent, arg, size);
+  chars_sent += size;
 
   // Send op code and args to proxy
   JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)

@@ -564,21 +564,21 @@ void FNC_cudaSetupArgument(void) {
   size_t offset;
 
   char recv_buf[100];
-  char send_buf[100];
   int chars_rcvd = 0;
   int chars_sent = 0;
 
   // Receive the arguments
   // Compute total chars_rcvd to be read in the next msg
-  chars_rcvd = sizeof arg + sizeof size + sizeof offset;
+  chars_rcvd = sizeof size + sizeof offset;
   assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
   chars_rcvd = 0;
-  memcpy(&arg, recv_buf + chars_rcvd, sizeof arg);
-  chars_rcvd += sizeof arg;
   memcpy(&size, recv_buf + chars_rcvd, sizeof size);
   chars_rcvd += sizeof size;
   memcpy(&offset, recv_buf + chars_rcvd, sizeof offset);
   chars_rcvd += sizeof offset;
+  assert(read(skt_accept, recv_buf + chars_rcvd, size) == size);
+  arg = recv_buf + chars_rcvd;
+  chars_rcvd += size;
 
   // Make the function call
   cudaError_t ret_val = cudaSetupArgument(arg, size, offset);
