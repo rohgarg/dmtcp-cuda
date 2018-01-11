@@ -88,9 +88,7 @@ bool should_log_cuda_calls();
 void userfaultfd_initialize(void);
 void segvfault_initialize(void);
 void reset_uffd(void);
-// FIXME: cudaSyscallsStructure is no longer being used.
-// void* create_shadow_pages(size_t size,
-//  cudaSyscallStructure *remoteInfo = NULL);
+void* create_shadow_pages(size_t size, void *remoteAddress = NULL);
 void unregister_all_pages();
 void register_all_pages();
 void flushDirtyPages();
@@ -152,6 +150,7 @@ enum cuda_op {
   OP_cudaMemcpyToArray,
   OP_cudaStreamCreate,
   OP_cudaThreadExit,
+  OP_cudaMallocManaged,
   OP_LAST_FNC
 };
 
@@ -204,5 +203,6 @@ void FNC_cudaMemGetInfo(void);
 void FNC_cudaMemcpyToArray(void);
 void FNC_cudaStreamCreate(void);
 void FNC_cudaThreadExit(void);
+void FNC_cudaMallocManaged(void);
 
 #endif // ifndef _CUDA_PLUGIN_H_

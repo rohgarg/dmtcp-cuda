@@ -9,57 +9,61 @@
 #include "config.h"
 #include "cuda_plugin.h"
 
-// FIXME: cudaSyscallStructure is no longer being used.
-// 0.
+// XXX: cudaMallocManaged is more or less the same as cudaMalloc, except
+// for the additional creation of shadow pages.
 EXTERNC cudaError_t
 cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
 {
-//  if (!initialized)
-//    proxy_initialize();
-//
-// #ifdef USERFAULTFD_INITIALIZED
-//  if (!ufd_initialized)
-//    userfaultfd_initialize();
-// #else
-//  if (!segvfault_initialized)
-//    segvfault_initialize();
-// #endif
-//
-//  cudaSyscallStructure strce_to_send, rcvd_strce;
-//  cudaError_t ret_val;
-//  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-//
-//  strce_to_send.op = CudaMallocManaged;
-//  strce_to_send.syscall_type.cuda_malloc.pointer = *pointer;
-//  strce_to_send.syscall_type.cuda_malloc.size = size;
-//  // TODO: Add field for flags
-//
-//  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-//  JASSERT(ret_val == cudaSuccess)\
-//         (ret_val).Text("Failed to create UVM region");
-//
-//  // change the pointer to point the global memory (device memory)
-//  *pointer = create_shadow_pages(size, &rcvd_strce);
-//
-//  if (should_log_cuda_calls()) {
-//    // record this system call to the log file
-//    memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-//    strce_to_send.op = CudaMallocManaged;
-//    strce_to_send.syscall_type.cuda_malloc.pointer = pointer;
-//    strce_to_send.syscall_type.cuda_malloc.size = size;
-//
-//
-//    /*
-//    In the current design the below signature should be used.
-//    void log_append(void *ptr, size_t size);
-//    for debugging and testing purposes I'm using dummy agrs for now.
-//    */
-//    char buf[1000];
-//    size_t size = 128;
-//    log_append((void *)buf, size);
-//  }
+  if (!initialized)
+    proxy_initialize();
+
+#ifdef USERFAULTFD_INITIALIZED
+  if (!ufd_initialized)
+    userfaultfd_initialize();
+#else
+  if (!segvfault_initialized)
+    segvfault_initialize();
+#endif
 
   cudaError_t ret_val;
+  char send_buf[1000];
+  char recv_buf[1000];
+  int chars_sent = 0;
+  int chars_rcvd = 0;
 
-  return ret_val; // just for testing purpose.
+  // Write the IN arguments to the proxy
+  enum cuda_op op = OP_cudaMallocManaged;
+  memcpy(send_buf + chars_sent, &op, sizeof op);
+  chars_sent += sizeof(enum cuda_op);
+  memcpy(send_buf + chars_sent, & size, sizeof size);
+  chars_sent += sizeof size;
+  memcpy(send_buf + chars_sent, & flags, sizeof flags);
+  chars_sent += sizeof flags;
+
+  // Send op code and args to proxy
+  JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
+         (JASSERT_ERRNO);
+
+  // Receive the OUT arguments after the proxy made the function call
+  // Compute total chars_rcvd to be read in the next msg
+  chars_rcvd = sizeof *pointer;
+  chars_rcvd += sizeof ret_val;
+  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
+         (JASSERT_ERRNO);
+
+  // Extract OUT variables
+  chars_rcvd = 0;
+  memcpy(pointer, recv_buf + chars_rcvd, sizeof *pointer);
+  chars_rcvd += sizeof *pointer;
+
+  memcpy(&ret_val, recv_buf + chars_rcvd, sizeof ret_val);
+  JASSERT(ret_val == cudaSuccess)\
+         (ret_val).Text("Failed to create UVM region");
+
+  // change the pointer to point the global memory (device memory)
+  *pointer = create_shadow_pages(size, *pointer);
+
+  // TODO:  Add logging
+
+  return ret_val;
 }

@@ -280,6 +280,9 @@ void do_work() {
     case OP_cudaThreadExit:
       FNC_cudaThreadExit();
       break;
+    case OP_cudaMallocManaged:
+      FNC_cudaMallocManaged();
+      break;
     }
   }
 }
@@ -1707,3 +1710,37 @@ void FNC_cudaFree(void) {
   memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
   assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
 };
+
+void FNC_cudaMallocManaged(void) {
+  void * * pointer;
+  size_t size;
+  unsigned int flags;
+
+  char recv_buf[100];
+  char send_buf[100];
+  int chars_rcvd = 0;
+  int chars_sent = 0;
+  // Receive the arguments
+  // Compute total chars_rcvd to be read in the next msg
+  chars_rcvd = sizeof size + sizeof flags;
+  assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
+  chars_rcvd = 0;
+  memcpy(&size, recv_buf + chars_rcvd, sizeof size);
+  chars_rcvd += sizeof size;
+  memcpy(&flags, recv_buf + chars_rcvd, sizeof flags);
+  chars_rcvd += sizeof flags;
+
+  // Declare base variables for OUT arguments to point to
+  void * base_pointer;
+  pointer = &base_pointer;
+
+  // Make the function call
+  cudaError_t ret_val = cudaMallocManaged(pointer, size, flags);
+
+  // Write back the arguments to the application
+  memcpy(send_buf + chars_sent, pointer, sizeof *pointer);
+  chars_sent += sizeof *pointer;
+  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
+  chars_sent += sizeof ret_val;
+  assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
+}

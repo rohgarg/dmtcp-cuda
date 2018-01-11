@@ -165,35 +165,18 @@ flushDirtyPages()
 // I changed the signature of create_shadow_pages for testing
 // purpose.
 
-// void*
-// create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
-// {
-//  int npages = size / page_size + 1;
-//  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
-//  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
-//                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-//
-//  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-// #ifdef USERFAULTFD
-//  monitor_pages(addr, npages * page_size, remoteInfo);
-// #endif
-//  return addr;
-// }
-
 void*
-create_shadow_pages(size_t size, void *remoteInfo)
+create_shadow_pages(size_t size, void *remoteAddr)
 {
-//  int npages = size / page_size + 1;
-//  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
-//  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
-//                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-//
-//  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-// #ifdef USERFAULTFD
-//  monitor_pages(addr, npages * page_size, remoteInfo);
-// #endif
-//  return addr;
-  return NULL; // Just for testing purpose.
+  int npages = size / page_size + 1;
+  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+
+  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
+#ifdef USERFAULTFD
+  monitor_pages(addr, npages * page_size, remoteInfo);
+#endif
+  return addr;
 }
 
 #ifdef USERFAULTFD
