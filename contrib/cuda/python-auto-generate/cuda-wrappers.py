@@ -677,7 +677,9 @@ def write_cuda_bodies(fnc, args):
       (var, size) = (arg["name"], "sizeof *" + arg["name"])
       cudaproxy2.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
                         "  chars_sent += %s;\n") % (var, size, size))
-  cudaproxy2.write("  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);\n")
+  cudaproxy2.write("""  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
+  chars_sent += sizeof ret_val;
+""")
   cudaproxy2.write(
 """  assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
 """)
