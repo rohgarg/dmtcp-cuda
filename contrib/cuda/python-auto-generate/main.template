@@ -114,8 +114,10 @@ cudaMalloc(:OUT void **pointer, size_t size)
 
 ## FIXME: This may need custom handling if pointer points to memory
 #    in proxy on host
-#EXTERNC cudaError_t
-#cudaFree(void *pointer)
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaFree(void *pointer)
+)
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
@@ -188,9 +190,10 @@ EXTERNC cudaError_t
 cudaSetupArgument(:IN_BUF const void *arg, :SIZE size_t size, size_t offset)
 )
 
-## FIXME: This needs custom handling
-#EXTERNC cudaError_t
-#cudaLaunch(const void *func)
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaLaunch(const void *func)
+)
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
