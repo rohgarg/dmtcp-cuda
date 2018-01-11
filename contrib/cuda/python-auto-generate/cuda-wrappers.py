@@ -492,6 +492,21 @@ def write_cuda_bodies(fnc, args):
 
 """)
 
+  cudaproxy_prolog = (
+"""  char send_buf[1000];
+  int chars_sent = 0;
+""")
+  def some_incoming_args(args):
+    return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
+  if some_incoming_args(args):
+    cudaproxy_prolog += (
+"""  char recv_buf[1000];
+  int chars_rcvd = 0;
+""")
+
+  #====
+  # Now write body of application function and proxy function
+
   # This code process the messages due to cudaMemcpy as extra messages.
   # It is inserted after sending and receiving messages in application and proxy
   (application_before, application_after, proxy_before, proxy_after) = \
@@ -591,18 +606,7 @@ def write_cuda_bodies(fnc, args):
   # Write FNC_XXX() declarations into the second half of the .h file.
   cudaproxy2.write("void FNC_" + fnc["name"] + "(void) {\n")
   cudaproxy2.write(fnc_args.replace("const ", "") + "\n")
-  cudaproxy2.write(
-"""  char send_buf[1000];
-  int chars_sent = 0;
-""")
-  def some_incoming_args(args):
-    return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
-  if some_incoming_args(args):
-    cudaproxy2.write(
-"""  char recv_buf[1000];
-  int chars_rcvd = 0;
-
-""")
+  cudaproxy2.write(cudaproxy_prolog)
 
   args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
                                              if arg["tag"][0] in in_style_tags]
