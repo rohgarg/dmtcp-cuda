@@ -53,7 +53,7 @@ myinput = wrapper_declarations
 lexified = []
 while(myinput):
   myinput = myinput.strip()
-  comment = get_comment(myinput) 
+  comment = get_comment(myinput)
   if comment:
     word = comment
   else:
@@ -200,11 +200,29 @@ while ast_wrappers:
 def cudaMemcpyExtraCode(args, isLogging):
   (application_before, application_after, proxy_before, proxy_after) = 4*[""]
   args_dict = {}
-  for key in ["DEST", "SRC", "SIZE", "DEST_PITCH", "SRC_PITCH", "HEIGHT",
-              "DIRECTION"]:
+  for key in ["DEST", "SRC", "IN_BUF", "SIZE",
+              "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]:
     args_dict[key] = None  # Default for standard keys is: None
   for arg in args:
     args_dict[arg["tag"][0]] = arg["name"]
+
+  if args_dict["IN_BUF"]:  # if "IN_BUF" and "SIZE" exist
+    application_before += (
+"""  JASSERT(write(skt_master, %s, %s) == %s) (JASSERT_ERRNO);
+""" % (args_dict["IN_BUF"], args_dict["SIZE"], args_dict["SIZE"]))
+    proxy_before += (
+"""  // Allocate memory for IN_BUF arguments and receive data
+  %s = malloc(%s);
+  assert(read(skt_accept, %s, %s) == %s);
+""" % (args_dict["IN_BUF"], args_dict["SIZE"],
+       args_dict["IN_BUF"], args_dict["SIZE"], args_dict["SIZE"]))
+    proxy_after += (
+"""
+  // Free the buffer for IN_BUF arguments
+  free(%s);
+""" % args_dict["IN_BUF"])
+
+  #====
   # Generate non-trivial extra code only if "DIRECTION" tag was specified.
   if not args_dict["DIRECTION"]:
     return (application_before, application_after, proxy_before, proxy_after)
@@ -223,9 +241,9 @@ def cudaMemcpyExtraCode(args, isLogging):
   }
 """ % (args_dict["DIRECTION"], args_dict["DEST"], args_dict["SRC"]))
 
-  assert "size" not in args_dict.values()  # Avoid name clash
+  assert "_size" not in args_dict.values()  # Avoid name clash
   application_before += (
-"""  int size = -1;
+"""  int _size = -1;
 """)
 
   if args_dict["SIZE"]:
@@ -236,17 +254,17 @@ def cudaMemcpyExtraCode(args, isLogging):
 
   if args_dict["SIZE"]:
     size_appl_send = size_proxy_recv = (
-"""size = %s;""") % args_dict["SIZE"]
+"""_size = %s;""") % args_dict["SIZE"]
   else:
     size_appl_send = size_proxy_recv = (
-"""size = %s * %s;""") % (args_dict["SRC_PITCH"], args_dict["HEIGHT"])
+"""_size = %s * %s;""") % (args_dict["SRC_PITCH"], args_dict["HEIGHT"])
 
   if args_dict["SIZE"]:
     size_proxy_send = size_appl_recv = (
-"""size = %s;""") % args_dict["SIZE"]
+"""_size = %s;""") % args_dict["SIZE"]
   else:
     size_proxy_send = size_appl_recv = (
-"""size = %s * %s;""") % (args_dict["DEST_PITCH"], args_dict["HEIGHT"])
+"""_size = %s * %s;""") % (args_dict["DEST_PITCH"], args_dict["HEIGHT"])
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
     application_before += (
@@ -257,7 +275,7 @@ def cudaMemcpyExtraCode(args, isLogging):
     // Send source buffer to proxy process
     // NOTE: As an optimization, HostToHost could be done locally.
     // NOTE:  This assumes no pinnned memory.
-    JASSERT(write(skt_master, %s, size) == size) (JASSERT_ERRNO);
+    JASSERT(write(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
   }
 """ % (size_appl_send, args_dict["DIRECTION"], args_dict["SRC"]))
   # NOTE:  We should not be logging these large buggers.
@@ -266,26 +284,26 @@ def cudaMemcpyExtraCode(args, isLogging):
   if (isLogging):
     # Add '{' in comment, so editors will see balanced braces.
     cudawrappers.write(
-"""log_append(%s, size);
+"""log_append(%s, _size);
   }
 """ % args_dict["SRC"])
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
     direction_declared = True
     proxy_before += (
-"""  int size = -1;
+"""  int _size = -1;
   %s
   direction = %s;
   if (direction == cudaMemcpyHostToDevice ||
       direction == cudaMemcpyHostToHost) {
     // Receive source buffer from application process
-    %s = malloc(size);
-    assert(read(skt_accept, %s, size) == size);
+    %s = malloc(_size);
+    assert(read(skt_accept, %s, _size) == _size);
     // Get ready for receiving memory from device when making CUDA call
     %s
     // NEEDED FOR DeviceToHost; SHOULD REUSE OLD malloc() for HostToHost
     // NOTE:  This assumes no pinnned memory.
-    %s = malloc(size);
+    %s = malloc(_size);
   }
 """ % (size_proxy_recv, args_dict["DIRECTION"], args_dict["SRC"],
        args_dict["SRC"], size_proxy_send, args_dict["DEST"]))
@@ -306,7 +324,7 @@ def cudaMemcpyExtraCode(args, isLogging):
     // Send  dest buffer to application process
     // NOTE:  This assumes no pinnned memory.
     free(%s);
-    assert(write(skt_accept, %s, size) == size);
+    assert(write(skt_accept, %s, _size) == _size);
     free(%s);
   }
 """ % (args_dict["SRC"], args_dict["DEST"],
@@ -320,7 +338,7 @@ def cudaMemcpyExtraCode(args, isLogging):
       direction == cudaMemcpyHostToHost) {
     // Receive dest buffer from proxy process
     // NOTE:  This assumes no pinnned memory.
-    JASSERT(read(skt_master, %s, size) == size) (JASSERT_ERRNO);
+    JASSERT(read(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
   }
 """ % (size_appl_recv, args_dict["DIRECTION"], args_dict["DEST"]))
 
@@ -448,8 +466,9 @@ def write_cuda_bodies(fnc, args):
                ', '.join([arg["name"] for arg in args]) +
                ')'
              )
-  in_style_tags = ["IN", "SIZE", "DEST_PITCH", "SRC_PITCH", "HEIGHT",
-                   "DIRECTION"]
+  # These parameters must be passed to proxy as copy-by-value
+  in_style_tags = ["IN", "SIZE", "DEST", "SRC",
+                   "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]
   direction_declared = False;
 
   cudawrappers_prolog = (
@@ -485,7 +504,7 @@ def write_cuda_bodies(fnc, args):
   if fnc["type"].startswith("EXTERNC "):
     # Remove "EXTERNC for all uses after this (inside a function)
     fnc["type"] = fnc["type"][len("EXTERNC "):]
-  
+
   cudawrappers.write(cudawrappers_prolog)
   cudawrappers.write(
 """  // Write the IN arguments to the proxy
@@ -593,30 +612,36 @@ def write_cuda_bodies(fnc, args):
   (
 """  // Compute total chars_rcvd to be read in the next msg
   chars_rcvd = """ + args_in_sizeof + """;
-  assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);"""
+  assert(read(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
+  // Now read the data for the total chars_rcvd"""
   if len(args_in_sizeof) > 0
   else "  // No primitive args to receive.  Will not read from skt_accept.") +
 """
   chars_rcvd = 0;
 """)
   for arg in args:
-    if arg["tag"][0] in in_style_tags:
+    if arg["tag"][0] in in_style_tags:  # if copy-by-value parameter
       (var, size) = (arg["name"], "sizeof " + arg["name"])
       cudaproxy2.write(("  memcpy(&%s, recv_buf + chars_rcvd, %s);\n" +
                         "  chars_rcvd += %s;\n") % (var, size, size))
+  for arg in args:
+    if arg["tag"][0] in in_style_tags:
+      pass  # Already handled above
     elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
       # Typically, the cuda parameter is of type:  struct cudaSomething *param
       # Strip one '*' from arg["type"] on next line
       (type, base_var, size) = (arg["type"].rstrip()[:-1].rstrip(),
-                                "base_" + arg["name"], "sizeof *" + var)
+                                "base_" + arg["name"], "sizeof *" + arg["name"])
       assert arg["type"].rstrip()[-1] == '*'
-      cudaproxy2.write((
-"""  // Declare base variables for OUT arguments to point to
+      cudaproxy2.write(
+"""  // Declare base variables for IN_DEEPCOPY and INOUT arguments to point to
   %s %s;
   %s = &%s;
   memcpy(&%s, recv_buf + chars_rcvd, %s);
   chars_rcvd += %s;
-""") % (type.replace("const ", ""), base_var, arg["name"], base_var, base_var, size, size))
+""" % (type.replace("const ", ""), base_var, arg["name"], base_var, base_var,
+       size, size))
+
   # This occurs after we receive from the application process because
   #   application_before did not use the send_buf.  It sent its own send,
   #   since this was typically a pointer to a buffer in the application code.

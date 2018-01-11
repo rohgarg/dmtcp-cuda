@@ -27,6 +27,9 @@
 #
 # :IN - in parameter (copy-by-value); This is the default if no tag present.
 #       The application process passes this to the proxy process.
+# :IN_BUF, :SIZE - :IN_BUF is a pointer (usually 'void *') and :SIZE is 'size_t'
+#       EXAMPLE: ssize_t write(int fd,
+#                              :IN_BUF const void *buf, :SIZE size_t count);
 # :OUT - out parameter; Argument is pointer different from "char *" and "void *"
 #       The proxy process writes to a local variable pointed to by arg.
 #       The value of the local variable is passed back to the
@@ -182,7 +185,7 @@ cudaConfigureCall(dim3 gridDim, dim3 blockDim,
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
-cudaSetupArgument(const void *arg, size_t size, size_t offset)
+cudaSetupArgument(:IN_BUF const void *arg, :SIZE size_t size, size_t offset)
 )
 
 ## FIXME: This needs custom handling
@@ -426,11 +429,14 @@ cudaMemsetAsync(:IN void* devPtr, int value, size_t count,
 # NOTE:  Because proxy is a fork of application process, the func ptr
 #        should be the same on proxy and application.  So, the default :IN
 #        tag suffices here.
-CUDA_WRAPPER(
-EXTERNC cudaError_t
-cudaOccupancyMaxActiveBlocksPerMultiprocessor(:OUT int *numBlocks,
-           const void *func, int blockSize, size_t dynamicSMemSize)
-)
+# Getting: 'error: identifier "cudaOccupancyMaxActiveBlocksPerMultiprocessor"
+#           is undefined'
+#           from nvcc in cudaproxy.icu ; commenting this out for now.
+# CUDA_WRAPPER(
+# EXTERNC cudaError_t
+# cudaOccupancyMaxActiveBlocksPerMultiprocessor(:OUT int *numBlocks,
+#            const void *func, int blockSize, size_t dynamicSMemSize)
+# )
 
 ## FIXME: return value type is not "cudaError_t"
 #         check if the script handles this case.
@@ -457,12 +463,15 @@ cudaMemGetInfo(:OUT size_t* free, :OUT size_t* total)
 )
 
 ## FIXME: cudaArray_t is a ptr and should be handled as such.
-CUDA_WRAPPER(
-EXTERNC cudaError_t
-cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset,
-                  :SRC const void* src, :SIZE size_t count,
-                  :DIRECTION enum cudaMemcpyKind kind)
-)
+##   typedef cudaArray * cudaArray_t
+##   I'm commenting out this wrapper until we understand cudaArray better
+##   See: om/questions/14450029/cudaarray-vs-device-pointer
+# CUDA_WRAPPER(
+# EXTERNC cudaError_t
+# cudaMemcpyToArray(:DEST cudaArray_t dst, size_t wOffset, size_t hOffset,
+#                   :SRC const void* src, :SIZE size_t count,
+#                   :DIRECTION enum cudaMemcpyKind kind)
+# )
 
 ## NOTE:  cudaStream_t - [PTR] typedef CUstream_st * cudaStream_t
 ##  Needs testing.  Presumably, a CUstream_st struct is at a unique
