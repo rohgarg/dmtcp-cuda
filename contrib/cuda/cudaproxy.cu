@@ -45,6 +45,7 @@ static trampoline_info_t main_trampoline_info;
 #ifndef PYTHON_AUTO_GENERATE
 static int compute(int fd, cudaSyscallStructure *structure);
 #endif
+int skt_accept;
 static int start_proxy(void);
 
 // This is the trampoline destination for the user main; this does not return
@@ -67,7 +68,7 @@ void proxy_init()
 static int start_proxy(void)
 {
   // set up the server
-  int skt_proxy, skt_accept;
+  int skt_proxy;
   struct sockaddr_un sa_proxy;
   const char *sktname = getenv("CUDA_PROXY_SOCKET");
   if (!sktname) {
