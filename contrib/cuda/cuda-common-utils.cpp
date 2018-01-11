@@ -93,31 +93,32 @@ void proxy_initialize(void)
   initialized = True;
 }
 
-#ifndef PYTHON_AUTO_GENERATE
-    // Old non-auto-generated version
-// open the log file and
-// append a cuda system call structure to it
-void log_append(cudaSyscallStructure record)
-{
-  printf("**** OBSOLETE:  Please re-write to use log/replay style from"
-         "log_append_and_read.cpp\n");
-  JASSERT(write(logFd, &record, sizeof(record)) != -1)(JASSERT_ERRNO);
-}
+// #ifndef PYTHON_AUTO_GENERATE
+//    // Old non-auto-generated version
+//// open the log file and
+//// append a cuda system call structure to it
+// void log_append(cudaSyscallStructure record)
+// {
+//  printf("**** OBSOLETE:  Please re-write to use log/replay style from"
+//         "log_append_and_read.cpp\n");
+//  JASSERT(write(logFd, &record, sizeof(record)) != -1)(JASSERT_ERRNO);
+// }
+//
+// bool log_read(cudaSyscallStructure *record)
+// {
+//  printf("**** OBSOLETE:  Please re-write to use log/replay style from"
+//         "log_append_and_read.cpp\n");
+//  int ret = read(logFd, record, sizeof(*record));
+//  if (ret == -1) {
+//    JASSERT(false)(JASSERT_ERRNO);
+//  }
+//  if (ret == 0 || ret < sizeof(*record)) {
+//    return false;
+//  }
+//  return true;
+// }
 
-bool log_read(cudaSyscallStructure *record)
-{
-  printf("**** OBSOLETE:  Please re-write to use log/replay style from"
-         "log_append_and_read.cpp\n");
-  int ret = read(logFd, record, sizeof(*record));
-  if (ret == -1) {
-    JASSERT(false)(JASSERT_ERRNO);
-  }
-  if (ret == 0 || ret < sizeof(*record)) {
-    return false;
-  }
-  return true;
-}
-#else
+// #else
 // The previous design (not using auto-generated code) required
 //   cudaSyscallStructure *record
 // where the struct would be a union of all possible structs for any CUDA call.
@@ -153,53 +154,54 @@ void * log_read(size_t *size) { // size is an "out" parameter
   JASSERT(read(logFd, log_read_buf, *size) != *size)(JASSERT_ERRNO);
   return log_read_buf;
 }
-#endif
+// #endif
 
 /*
   This function sends to the proxy the structure with cuda syscall parameters.
   It then receives the return value and gets the structure back.
 */
-void send_recv(int fd, cudaSyscallStructure *strce_to_send,
-               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val)
-{
-  // send the structure
-  JASSERT(write(fd, strce_to_send, sizeof(cudaSyscallStructure)) != -1)
-         (JASSERT_ERRNO);
 
-  if (strce_to_send->payload) {
-    JASSERT(write(fd, strce_to_send->payload, strce_to_send->payload_size) !=
-            -1)(strce_to_send->payload)(JASSERT_ERRNO);
-  }
-
-  // receive the result
-  JASSERT(read(fd, ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
-
-
-  if (strce_to_send->op != CudaGetLastError){
-    JASSERT((*(cudaError_t*)ret_val) == cudaSuccess)
-       (cudaGetErrorString(*(cudaError_t*)ret_val)).Text("CUDA syscall failed");
-  }
-
-  // get the structure back
-  memset(rcvd_strce, 0, sizeof(cudaSyscallStructure));
-  JASSERT(read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) != -1)
-         (JASSERT_ERRNO);
-
-  switch(rcvd_strce->op)
-  {
-    case CudaGetErrorString:
-    {
-      // "cudaGetErrorString" is a special case, its return type
-      // is "const char *".
-      size_t size = (rcvd_strce->syscall_type).cuda_get_error_string.size;
-      char *error_string = (char *) malloc(size * sizeof(char));
-      JASSERT(read(fd, error_string, size) != -1) (JASSERT_ERRNO);
-      (rcvd_strce->syscall_type).cuda_get_error_string.error_string \
-       = error_string;
-    }
-    break;
-  }
-}
+// void send_recv(int fd, cudaSyscallStructure *strce_to_send,
+//               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val)
+// {
+//  // send the structure
+//  JASSERT(write(fd, strce_to_send, sizeof(cudaSyscallStructure)) != -1)
+//         (JASSERT_ERRNO);
+//
+//  if (strce_to_send->payload) {
+//    JASSERT(write(fd, strce_to_send->payload, strce_to_send->payload_size) !=
+//            -1)(strce_to_send->payload)(JASSERT_ERRNO);
+//  }
+//
+//  // receive the result
+//  JASSERT(read(fd, ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
+//
+//
+//  if (strce_to_send->op != CudaGetLastError){
+//    JASSERT((*(cudaError_t*)ret_val) == cudaSuccess)
+//  (cudaGetErrorString(*(cudaError_t*)ret_val)).Text("CUDA syscall failed");
+//  }
+//
+//  // get the structure back
+//  memset(rcvd_strce, 0, sizeof(cudaSyscallStructure));
+//  JASSERT(read(fd, rcvd_strce, sizeof(cudaSyscallStructure)) != -1)
+//         (JASSERT_ERRNO);
+//
+//  switch(rcvd_strce->op)
+//  {
+//    case CudaGetErrorString:
+//    {
+//      // "cudaGetErrorString" is a special case, its return type
+//      // is "const char *".
+//      size_t size = (rcvd_strce->syscall_type).cuda_get_error_string.size;
+//      char *error_string = (char *) malloc(size * sizeof(char));
+//      JASSERT(read(fd, error_string, size) != -1) (JASSERT_ERRNO);
+//      (rcvd_strce->syscall_type).cuda_get_error_string.error_string \
+//       = error_string;
+//    }
+//    break;
+//  }
+//}
 
 void
 disable_cuda_call_logging()

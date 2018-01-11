@@ -64,56 +64,62 @@ allShadowRegions()
 static bool
 sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 {
-  cudaSyscallStructure strce_to_send, rcvd_strce;
+// FIXME: cudaSyscallsStructure is no longer being used.
+//  cudaSyscallStructure strce_to_send, rcvd_strce;
+//
+//  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+//  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
+//
+//  strce_to_send.op = CudaMallocManagedMemcpy;
+//  strce_to_send.syscall_type.cuda_memcpy.destination = remotePtr;
+//  strce_to_send.syscall_type.cuda_memcpy.source = localPtr;
+//  strce_to_send.syscall_type.cuda_memcpy.size = size;
+//  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyHostToDevice;
+//  strce_to_send.payload = localPtr;
+//  strce_to_send.payload_size = size;
+//
+//  // send the structure
+//  cudaError_t ret_val;
+//  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+//  JASSERT(ret_val == cudaSuccess)(ret_val)
+//          .Text("Failed to send UVM dirty pages");
 
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
-
-  strce_to_send.op = CudaMallocManagedMemcpy;
-  strce_to_send.syscall_type.cuda_memcpy.destination = remotePtr;
-  strce_to_send.syscall_type.cuda_memcpy.source = localPtr;
-  strce_to_send.syscall_type.cuda_memcpy.size = size;
-  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyHostToDevice;
-  strce_to_send.payload = localPtr;
-  strce_to_send.payload_size = size;
-
-  // send the structure
-  cudaError_t ret_val;
-  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
-  JASSERT(ret_val == cudaSuccess)(ret_val)
-          .Text("Failed to send UVM dirty pages");
+  return true; // For testing purpose.
 }
 
 static bool
 receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 {
-  cudaSyscallStructure strce_to_send, rcvd_strce;
+// FIXME: cudaSyscallsStructure is no longer being used.
+//  cudaSyscallStructure strce_to_send, rcvd_strce;
+//
+//  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
+//  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
+//
+//  strce_to_send.op = CudaMallocManagedMemcpy;
+//  strce_to_send.syscall_type.cuda_memcpy.destination = localPtr;
+//  strce_to_send.syscall_type.cuda_memcpy.source = remotePtr;
+//  strce_to_send.syscall_type.cuda_memcpy.size = size;
+//  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyDeviceToHost;
+//
+//  // send the structure
+//  JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
+//         (JASSERT_ERRNO);
+//
+//  // get the payload: part of the GPU computation actually
+//  // XXX: We read a page at a time
+//  JASSERT(dmtcp::Util::readAll(skt_master, localPtr, size) == size)
+//         (JASSERT_ERRNO);
+//
+//  // TODO: Verify the return val
+//  cudaError_t ret_val;
+//  JASSERT(read(skt_master, &ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
+//  JASSERT(ret_val == cudaSuccess)(ret_val)
+//          .Text("Failed to receive UVM data");
+//  JASSERT(read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) != -1)
+//          (JASSERT_ERRNO);
 
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
-
-  strce_to_send.op = CudaMallocManagedMemcpy;
-  strce_to_send.syscall_type.cuda_memcpy.destination = localPtr;
-  strce_to_send.syscall_type.cuda_memcpy.source = remotePtr;
-  strce_to_send.syscall_type.cuda_memcpy.size = size;
-  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyDeviceToHost;
-
-  // send the structure
-  JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
-         (JASSERT_ERRNO);
-
-  // get the payload: part of the GPU computation actually
-  // XXX: We read a page at a time
-  JASSERT(dmtcp::Util::readAll(skt_master, localPtr, size) == size)
-         (JASSERT_ERRNO);
-
-  // TODO: Verify the return val
-  cudaError_t ret_val;
-  JASSERT(read(skt_master, &ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
-  JASSERT(ret_val == cudaSuccess)(ret_val)
-          .Text("Failed to receive UVM data");
-  JASSERT(read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) != -1)
-          (JASSERT_ERRNO);
+  return true; // For testing purpose.
 }
 
 static void
@@ -155,19 +161,39 @@ flushDirtyPages()
  * Creates shadow pages that are monitored for reads and writes
  * by the page fault handler.
  */
-void*
-create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
-{
-  int npages = size / page_size + 1;
-  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
-  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+// FIXME: cudaSyscallStructure is no longer being used.
+// I changed the signature of create_shadow_pages for testing
+// purpose.
 
-  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-#ifdef USERFAULTFD
-  monitor_pages(addr, npages * page_size, remoteInfo);
-#endif
-  return addr;
+// void*
+// create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
+// {
+//  int npages = size / page_size + 1;
+//  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
+//  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
+//                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+//
+//  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
+// #ifdef USERFAULTFD
+//  monitor_pages(addr, npages * page_size, remoteInfo);
+// #endif
+//  return addr;
+// }
+
+void*
+create_shadow_pages(size_t size, void *remoteInfo)
+{
+//  int npages = size / page_size + 1;
+//  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
+//  void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
+//                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+//
+//  JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
+// #ifdef USERFAULTFD
+//  monitor_pages(addr, npages * page_size, remoteInfo);
+// #endif
+//  return addr;
+  return NULL; // Just for testing purpose.
 }
 
 #ifdef USERFAULTFD
@@ -459,8 +485,8 @@ segvfault_initialize(void)
 
   page_size = sysconf(_SC_PAGE_SIZE);
   // We need SHIFT inside segvfault_handler()
-  for (SHIFT = 0; (1<<SHIFT) < page_size; SHIFT++) ;
-  JASSERT(1<<SHIFT == page_size);
+  for (SHIFT = 0; (1 << SHIFT) < page_size; SHIFT++) ;
+  JASSERT(1 << SHIFT == page_size);
 
   // first install a PAGE FAULT handler: using sigaction
   static struct sigaction action;
@@ -478,7 +504,7 @@ segvfault_initialize(void)
 }
 
 void segvfault_handler(int signum, siginfo_t *siginfo, void *context){
-  // get which address segfaulted 
+  // get which address segfaulted
   void *addr = (void *) siginfo->si_addr;
   if (addr == NULL){
     perror("segvfault_handler");
@@ -507,9 +533,9 @@ void segvfault_handler(int signum, siginfo_t *siginfo, void *context){
 //   For now, I am giving all permissions.  We need to examine
 //   the state ("read", "write", or "CUDA call"), and give permission
 //   only acccording to the required state.
-  int flags = MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS;  
+  int flags = MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS;
   if (mmap(addr, page_size, prot, flags, -1, 0) == (void *)-1) {
-    perror("mmap"); 
+    perror("mmap");
     exit(1);
   }
 // FIXME (see above)
@@ -522,7 +548,7 @@ void segvfault_handler(int signum, siginfo_t *siginfo, void *context){
 //    perror("write");
 //    exit(1);
 //  }
-  //-- receive the page -- 
+  //-- receive the page --
   // read data in memory
   JTRACE("    SEGV page fault: ")
         (addr)(page_addr)(page_size);

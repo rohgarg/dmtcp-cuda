@@ -121,3 +121,25 @@ dst = malloc() should insted be dst = (cudaArray_t) malloc().
 I fixed this in the source code but the script should also
 be updated.
 FIXED (not yet: to be done by Gene)
+
+- dmtcp-cuda/contrib/cuda/cudaproxy.cu
+"int main()" should be "int main_wrapper()"
+The tempoline function calls "main_wrapper()" not "main".
+FIXED (The script should be updated)
+
+- dmtcp-cuda/contrib/cuda/cudaproxy.cu
+inside FNC_cudaMalloc():
+"chars_sent += sizeof ret_val" was missing
+FIXED (The script should be updated)
+
+- dmtcp-cuda/contrib/cuda/cudaproxy.cu & cuda-wrappers.cu
+cudaMemcpy(). Any of both pointers might be an address on the
+device, in which case it should be sent to the proxy. It seems
+like this was not accounted for.
+FIXED (as of Jan 10, 2018. But the script should also be updated)
+
+- dmtcp-cuda/contrib/cuda/python-auto-generate
+It is less error prone to simply send "ret_val" to the
+application instead of copying it to the buffer and ...
+Many wrappers had a bug because of this.
+FIXED (The script should be updated)
