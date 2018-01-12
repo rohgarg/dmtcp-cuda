@@ -107,6 +107,26 @@
 # These signatures are taken from the github repo, from cuda-wrappers.cpp
 ########################################################################
 
+# THIS IS JUST AN EXAMPLE.  This style allows the cuda plugin, for
+#   example, running in the application process, to call a function
+#   'proxy_precheckpoint(...)' that will #   be executed in the proxy process.
+# This uses the two items, CUDA_VERBATIM_PROXY() and CUDA_WAAPPER(), below.
+# DELETE THIS EXAMPLE, ONCE WE ARE USING THIS STYLE FOR ITS INTENDED PURPOSE.
+CUDA_VERBATIM_PROXY(
+EXTERNC int
+proxy_example_fnc(int arg1) {
+  if (arg1 != 500) {
+    printf("Hello, Mom!\n");
+  }
+return 0;
+}
+)
+
+CUDA_WRAPPER(
+EXTERNC int
+proxy_example_fnc(:IN int arg1)
+)
+
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)

@@ -96,8 +96,12 @@ def parse_aux(input, rest):
   delims = [',', '(', ')', ';']
   while(input):
     while input[0] in ["CUDA_VERBATIM_WRAPPER", "CUDA_VERBATIM_PROXY"]:
+      verbatim_type = input[0]
       (expr, input) = extract_balanced_expression(input)
-      verbatim_wrappers += "// Verbatim from " + sys.argv[1] + "\n" + expr+"\n"
+      if verbatim_type == "CUDA_VERBATIM_WRAPPER":
+        verbatim_wrappers+= "// Verbatim from " + sys.argv[1] + "\n" + expr+"\n"
+      elif verbatim_type == "CUDA_VERBATIM_PROXY":
+        verbatim_proxies += "// Verbatim from " + sys.argv[1] + "\n" + expr+"\n"
     all_delims = [x for x in input if x in delims]
     next_delim = all_delims and all_delims[0]
     if not next_delim:
@@ -734,11 +738,11 @@ cudawrappers.close()
 
 cudaproxy.write(cudaproxy_tail)
 cudaproxy.write("\n\n")
+cudaproxy.write(verbatim_proxies)
 cudaproxy2.seek(0)
 cudaproxy.write(cudaproxy2.read())
 cudaproxy2.close()
 os.remove(cudaproxy2.name)
-cudaproxy.write(verbatim_proxies)
 cudaproxy.close()
 
 
