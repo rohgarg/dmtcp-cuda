@@ -74,6 +74,7 @@ enum cuda_op {
   OP_cudaMemGetInfo,
   OP_cudaStreamCreate,
   OP_cudaThreadExit,
+  OP_proxy_cudaMallocManaged,
   OP_LAST_FNC
 };
 
@@ -125,5 +126,6 @@ void FNC_cudaGetErrorString(void);
 void FNC_cudaMemGetInfo(void);
 void FNC_cudaStreamCreate(void);
 void FNC_cudaThreadExit(void);
+void FNC_proxy_cudaMallocManaged(void);
 
 #endif // ifndef _CUDA_PLUGIN_H_

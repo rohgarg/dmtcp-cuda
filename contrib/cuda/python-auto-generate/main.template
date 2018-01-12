@@ -127,42 +127,40 @@ EXTERNC int
 proxy_example_fnc(:IN int arg1)
 )
 
-# CUDA_VERBATIM_PROXY(
-# EXTERNC cudaError_t
-# proxy_cudaFree_fnc(void *pointer) {
-#   // Make the function call
-#   printf("hello, ma'am\n");
-#   return cudaFree(pointer);
-# };
-# )
-#
-# CUDA_WRAPPER(
-# EXTERNC cudaError_t
-# proxy_cudaFree_fnc(void *pointer)
-# )
-#
-# CUDA_VERBATIM_WRAPPER(
-# EXTERNC cudaError_t
-# cudaFree(void *pointer) {
-#   if (is_pseudoPinnedMem(pointer)){
-#     pseudoPinnedMem_remove(pointer);
-#     return cudaSuccess;
-#   }
-#
-#   printf("hello, ma'am\n");
-#   return proxy_cudaFree_fnc(pointer);
-# };
-# )
+CUDA_VERBATIM_PROXY(
+EXTERNC cudaError_t
+proxy_cudaFree_fnc(void *pointer) {
+  // Make the function call
+  return cudaFree(pointer);
+};
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+proxy_cudaFree_fnc(void *pointer)
+)
+
+CUDA_VERBATIM_WRAPPER(
+EXTERNC cudaError_t
+cudaFree(void *pointer) {
+  if (is_pseudoPinnedMem(pointer)){
+    pseudoPinnedMem_remove(pointer);
+    return cudaSuccess;
+  }
+
+  return proxy_cudaFree_fnc(pointer);
+};
+)
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)
 )
 
-CUDA_WRAPPER(
-EXTERNC cudaError_t
-cudaFree(void* pointer)
-)
+# CUDA_WRAPPER(
+# EXTERNC cudaError_t
+# cudaFree(void* pointer)
+# )
 
 ## FIXME: This may need custom handling if pointer points to memory
 #    in proxy on host
