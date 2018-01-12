@@ -276,7 +276,7 @@ EXTERNC cudaError_t
 cudaSetupArgument(:IN_BUF const void *arg, :SIZE size_t size, size_t offset)
 )
 
-CUDA_WRAPPER(
+CUDA_WRAPPER_WITH_UVM_SYNC(
 EXTERNC cudaError_t
 cudaLaunch(const void *func)
 )
@@ -596,6 +596,30 @@ proxy_cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
 )
 
 CUDA_WRAPPER(
-EXTERNC int
+EXTERNC cudaError_t
 proxy_cudaMallocManaged(:OUT void **pointer, size_t size, unsigned int flags)
+)
+
+CUDA_VERBATIM_PROXY(
+EXTERNC cudaError_t
+proxy_cudaMallocManagedMemcpy(void *dst, void *src, size_t size, cudaMemcpyKind kind)
+{
+  cudaError_t err = cudaSuccess;
+  switch (kind) {
+    case cudaMemcpyDeviceToHost:
+    case cudaMemcpyHostToDevice:
+      memcpy(dst, src, size);
+      break;
+
+    default:
+      err = cudaErrorInvalidMemcpyDirection;
+      break;
+  }
+  return err;
+}
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+proxy_cudaMallocManagedMemcpy(:DEST void *dst, :SRC void *src, :SIZE size_t size, :DIRECTION cudaMemcpyKind kind)
 )

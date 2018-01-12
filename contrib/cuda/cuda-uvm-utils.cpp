@@ -29,6 +29,10 @@ int SHIFT = -1;
 
 bool haveDirtyPages = false;
 
+EXTERNC cudaError_t
+proxy_cudaMallocManagedMemcpy(void *dst, void *src,
+                              size_t size, cudaMemcpyKind kind);
+
 // Private global vars
 
 struct ShadowRegion {
@@ -106,22 +110,9 @@ monitor_pages(void *addr, size_t size, void *remoteAddr = NULL)
 static bool
 sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 {
-  cudaSyscallStructure strce_to_send, rcvd_strce;
-
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
-
-  strce_to_send.op = CudaMallocManagedMemcpy;
-  strce_to_send.syscall_type.cuda_memcpy.destination = remotePtr;
-  strce_to_send.syscall_type.cuda_memcpy.source = localPtr;
-  strce_to_send.syscall_type.cuda_memcpy.size = size;
-  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyHostToDevice;
-  strce_to_send.payload = localPtr;
-  strce_to_send.payload_size = size;
-
-  // send the structure
-  cudaError_t ret_val;
-  send_recv(skt_master, &strce_to_send, &rcvd_strce, &ret_val);
+  cudaError_t ret_val = proxy_cudaMallocManagedMemcpy(remotePtr, localPtr,
+                                                      size,
+                                                      cudaMemcpyHostToDevice);
   JASSERT(ret_val == cudaSuccess)(ret_val)
           .Text("Failed to send UVM dirty pages");
 }
@@ -134,33 +125,11 @@ sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 static bool
 receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 {
-  cudaSyscallStructure strce_to_send, rcvd_strce;
-
-  memset(&strce_to_send, 0, sizeof(cudaSyscallStructure));
-  memset(&rcvd_strce, 0, sizeof(cudaSyscallStructure));
-
-  strce_to_send.op = CudaMallocManagedMemcpy;
-  strce_to_send.syscall_type.cuda_memcpy.destination = localPtr;
-  strce_to_send.syscall_type.cuda_memcpy.source = remotePtr;
-  strce_to_send.syscall_type.cuda_memcpy.size = size;
-  strce_to_send.syscall_type.cuda_memcpy.direction = cudaMemcpyDeviceToHost;
-
-  // send the structure
-  JASSERT(write(skt_master, &strce_to_send, sizeof(strce_to_send)) != -1)
-         (JASSERT_ERRNO);
-
-  // get the payload: part of the GPU computation actually
-  // XXX: We read a page at a time
-  JASSERT(dmtcp::Util::readAll(skt_master, localPtr, size) == size)
-         (JASSERT_ERRNO);
-
-  // TODO: Verify the return val
-  cudaError_t ret_val;
-  JASSERT(read(skt_master, &ret_val, sizeof(int)) != -1)(JASSERT_ERRNO);
+  cudaError_t ret_val = proxy_cudaMallocManagedMemcpy(remotePtr, localPtr,
+                                                      size,
+                                                      cudaMemcpyDeviceToHost);
   JASSERT(ret_val == cudaSuccess)(ret_val)
           .Text("Failed to receive UVM data");
-  JASSERT(read(skt_master, &rcvd_strce, sizeof(rcvd_strce)) != -1)
-          (JASSERT_ERRNO);
 }
 
 /*

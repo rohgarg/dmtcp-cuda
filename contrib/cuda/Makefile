@@ -128,10 +128,17 @@ run7.1: ${LIBNAME}.so cudaproxy test7.1
 restart:
 	../../bin/dmtcp_restart -j ckpt*.dmtcp
 
-check: auto-generate ${LIBNAME}.so cudaproxy test/test1
+check: auto-generate ${LIBNAME}.so cudaproxy check1 check2
+
+check1: test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
 	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} \
 	  --with-plugin $$PWD/${LIBNAME}.so test/test1
+
+check2: test2
+	# Note that full path of plugin (using $$PWD in this case) is required.
+	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} \
+	  --with-plugin $$PWD/${LIBNAME}.so test/test2
 
 # We link the library using C++ for compatibility with the main libdmtcp.so
 ${LIBNAME}.so: ${LIBOBJS}

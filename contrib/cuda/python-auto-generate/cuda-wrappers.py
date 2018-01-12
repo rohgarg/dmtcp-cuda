@@ -140,9 +140,10 @@ ast_wrappers = parse(myinput)
 # INPUT:  ast_wrappers (ast := Abstract Syntax Tree)
 # OUTPUT: ast_annotated_wrappers
 
-def generate_annotated_wrapper(isLogging, ast):  # abstract syntax tree
+def generate_annotated_wrapper(isLogging, flushDirtyPages, ast):  # abstract syntax tree
   fnc = { "type" : ' '.join(ast[0][:-1]), "name" : ast[0][-1],
-          "isLogging" : isLogging }
+          "isLogging" : isLogging,
+          "flushDirtyPages": flushDirtyPages}
   args = []
   raw_args = ast[1:][0][1:-1]  # Omit '(' and ')'
   # For 'int foo(void)', 'void' was parsed as a separate arg; remove it now.
@@ -177,10 +178,11 @@ def generate_annotated_wrapper(isLogging, ast):  # abstract syntax tree
 ast_annotated_wrappers = []
 while ast_wrappers:
   # ast_wrappers[0] : ['CUDA_WRAPPER' '(' FNC ARGS ')']
-  if ast_wrappers[0][0] in ["CUDA_WRAPPER", "CUDA_WRAPPER_WITH_LOGGING"]:
+  if ast_wrappers[0][0] in ["CUDA_WRAPPER", "CUDA_WRAPPER_WITH_LOGGING", "CUDA_WRAPPER_WITH_UVM_SYNC"]:
     isLogging = ast_wrappers[0][0] == "CUDA_WRAPPER_WITH_LOGGING"
+    flushDirtyPages = ast_wrappers[0][0] == "CUDA_WRAPPER_WITH_UVM_SYNC"
     del ast_wrappers[0]
-    ast_annotated_wrappers.append( generate_annotated_wrapper( isLogging,
+    ast_annotated_wrappers.append( generate_annotated_wrapper( isLogging, flushDirtyPages,
                                                         ast_wrappers[0][1:3]) )
     del ast_wrappers[0]
   else:
@@ -475,11 +477,18 @@ def write_cuda_bodies(fnc, args):
   in_style_tags = ["IN", "SIZE", "DEST", "SRC",
                    "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]
   direction_declared = False;
+  flushDirtyPages_prolog = (
+  """// TODO: Ideally, we should flush only when the function uses the
+  // data from the managed regions
+  if (haveDirtyPages)
+    flushDirtyPages();""")
 
   cudawrappers_prolog = (
 """{
   if (!initialized)
     proxy_initialize();
+
+  %s
 
   %s ret_val;
   char send_buf[1000];
@@ -487,7 +496,7 @@ def write_cuda_bodies(fnc, args):
   int chars_sent = 0;
   int chars_rcvd = 0;
 
-""" % fnc["type"].replace("EXTERNC ", ""))
+""" % (flushDirtyPages_prolog if fnc["flushDirtyPages"] else "", fnc["type"].replace("EXTERNC ", "")))
 
   if [myarg for myarg in args if myarg["tag"][0] == "DIRECTION"]:
     for myarg in args:

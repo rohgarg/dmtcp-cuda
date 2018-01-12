@@ -18,7 +18,7 @@ int main(int argc, char **argv)
         *a = 2;
         *b = 3;
         *c = 0;
-        sleep(10); // Sleep to allow for checkpointing
+        // sleep(10); // Sleep to allow for checkpointing
 	add<<<1,1>>>(a, b, c);
         cudaDeviceSynchronize();
 
