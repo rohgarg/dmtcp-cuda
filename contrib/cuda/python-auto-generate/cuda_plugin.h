@@ -32,7 +32,6 @@ enum cuda_op {
   OP_cudaMemcpy,
   OP_cudaMemcpy2D,
   OP_cudaMallocArray,
-  OP_cudaFree,
   OP_cudaFreeArray,
   OP_cudaConfigureCall,
   OP_cudaSetupArgument,
