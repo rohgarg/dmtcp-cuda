@@ -320,14 +320,14 @@ def cudaMemcpyExtraCode(args, isLogging):
       _direction == cudaMemcpyHostToHost) {
     // Send  dest buffer to application process
     // NOTE:  This assumes no pinnned memory.
-    free(%s);
     assert(write(skt_accept, %s, _size) == _size);
+    free(%s);
   }
   else if (_direction == cudaMemcpyHostToDevice) {
     free(%s);
   }
-""" % (args_dict["SRC"], args_dict["DEST"],
-       args_dict["DEST"]))
+""" % (args_dict["DEST"], args_dict["DEST"],
+       args_dict["SRC"]))
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
     application_after += (
