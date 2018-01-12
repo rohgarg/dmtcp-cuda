@@ -13,13 +13,16 @@ int main(int argc, char **argv)
 	int a = 2, b = 3, c;
 	int *cuda_c = NULL;
 
-	cudaMallocHost(&cuda_c, sizeof(int));
+	cudaMalloc(&cuda_c, sizeof(int));
 	add<<<1,1>>>(a, b, cuda_c);
-        // sleep(10);
+        sleep(10);
+        sleep(10);
 	cudaMemcpy(&c, cuda_c, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaFree(cuda_c);
 
 	printf("%d + %d = %d\n", a, b, c);
-        // sleep(10);
+        sleep(10);
+        sleep(10);
+
 	exit(EXIT_SUCCESS);
 }

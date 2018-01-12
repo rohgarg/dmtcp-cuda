@@ -1,0 +1,78 @@
+*** cudaproxy.icu	2018-01-12 10:30:00.380504945 -0500
+--- cudaproxy.icu.new	2018-01-12 10:25:58.155473859 -0500
+***************
+*** 288,293 ****
+--- 288,295 ----
+      assert(read(skt_accept, src, _size) == _size);
+      // Get ready for receiving memory from device when making CUDA call
+      _size = count;
++   }
++   else if (_direction == cudaMemcpyDeviceToHost) {
+      // NEEDED FOR DeviceToHost; SHOULD REUSE OLD malloc() for HostToHost
+      // NOTE:  This assumes no pinnned memory.
+      dst = malloc(_size);
+***************
+*** 305,314 ****
+        _direction == cudaMemcpyHostToHost) {
+      // Send  dest buffer to application process
+      // NOTE:  This assumes no pinnned memory.
+-     free(src);
+      assert(write(skt_accept, dst, _size) == _size);
+      free(dst);
+    }
+  };
+
+  void FNC_cudaMemcpy2D(void) {
+--- 307,318 ----
+        _direction == cudaMemcpyHostToHost) {
+      // Send  dest buffer to application process
+      // NOTE:  This assumes no pinnned memory.
+      assert(write(skt_accept, dst, _size) == _size);
+      free(dst);
+    }
++   else if (_direction == cudaMemcpyHostToDevice) {
++     free(src);
++   }
+  };
+
+  void FNC_cudaMemcpy2D(void) {
+***************
+*** 1363,1368 ****
+--- 1367,1374 ----
+      assert(read(skt_accept, src, _size) == _size);
+      // Get ready for receiving memory from device when making CUDA call
+      _size = count;
++   }
++   else if (_direction == cudaMemcpyDeviceToHost) {
+      // NEEDED FOR DeviceToHost; SHOULD REUSE OLD malloc() for HostToHost
+      // NOTE:  This assumes no pinnned memory.
+      dst = malloc(_size);
+***************
+*** 1376,1387 ****
+    chars_sent += sizeof ret_val;
+    assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
+    _direction = kind;
+!   if (_direction == cudaMemcpyDeviceToHost ||
+        _direction == cudaMemcpyHostToHost) {
+      // Send  dest buffer to application process
+      // NOTE:  This assumes no pinnned memory.
+      free(src);
+      assert(write(skt_accept, dst, _size) == _size);
+      free(dst);
+    }
+  };
+--- 1382,1395 ----
+    chars_sent += sizeof ret_val;
+    assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
+    _direction = kind;
+!   if (_direction == cudaMemcpyHostToDevice ||
+        _direction == cudaMemcpyHostToHost) {
+      // Send  dest buffer to application process
+      // NOTE:  This assumes no pinnned memory.
+      free(src);
+      assert(write(skt_accept, dst, _size) == _size);
++   }
++   else if (_direction == cudaMemcpyDeviceToHost) {
+      free(dst);
+    }
+  };

@@ -50,7 +50,9 @@ DEMO_PORT=7781
 default: auto-generate ${LIBNAME}.so
 
 auto-generate:
-	cd python-auto-generate && make
+	cd python-auto-generate && \
+	make && \
+	patch -p0 cudaproxy.icu < cudaproxy-cudaMemcpy.patch
 
 vi:
 	vim cuda-plugin.cpp
@@ -127,7 +129,7 @@ run7.1: ${LIBNAME}.so cudaproxy test7.1
 restart:
 	../../bin/dmtcp_restart -j ckpt*.dmtcp
 
-check: ${LIBNAME}.so cudaproxy test/test1
+check: auto-generate ${LIBNAME}.so cudaproxy test/test1
 	# Note that full path of plugin (using $$PWD in this case) is required.
 	${DMTCP_ROOT}/bin/dmtcp_launch --port ${DEMO_PORT} \
 	  --with-plugin $$PWD/${LIBNAME}.so test/test1
@@ -148,6 +150,7 @@ clean:
 	rm -f ${LIBOBJS} ${LIBNAME}.so test2 test/test2.1 cudaproxy cudaSysCallsLog
 	rm -f test/test_1 test/test1 test/test2 test/test3 test/test4 test/test5 test/test5 test/test6 test/test7
 	rm -f libcudaproxy.so
+	cd python-auto-generate && make clean
 
 distclean: clean
 	rm -f ${LIBNAME}.so *~ .*.swp dmtcp_restart_script*.sh ckpt_*.dmtcp

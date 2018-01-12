@@ -494,7 +494,7 @@ def write_cuda_bodies(fnc, args):
       elif myarg["tag"][0] == "DIRECTION":
         direction_var = myarg["name"]
     cudawrappers_prolog += (
-"""  enum cudaMemcpyKind _direction;
+"""  enum cudaMemcpyKind _direction = kind;
   if (%s == cudaMemcpyDefault) {
     cudaMemcpyGetDirection(%s, %s, &_direction);
     %s = _direction;
@@ -586,6 +586,7 @@ def write_cuda_bodies(fnc, args):
     cudawrappers.write("  chars_rcvd = %s + sizeof ret_val;\n" % sizeof_args)
   else:
     cudawrappers.write("  // (No primitive args to receive, except ret_val.)\n")
+    cudawrappers.write("  chars_rcvd = sizeof ret_val;\n")
   cudawrappers.write(
 """  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
          (JASSERT_ERRNO);
