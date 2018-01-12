@@ -228,22 +228,14 @@ def cudaMemcpyExtraCode(args, isLogging):
     return (application_before, application_after, proxy_before, proxy_after)
 
   assert args_dict["DIRECTION"] != "_direction"  # Check no name clash
-  application_before += (
-"""  enum cudaMemcpyKind _direction;
-""")
   proxy_before += (
 """  enum cudaMemcpyKind _direction;
 """)
 
-  application_before += (
-"""  if (%s == cudaMemcpyDefault) {
-    cudaMemcpyGetDirection(%s, %s, &_direction);
-  }
-""" % (args_dict["DIRECTION"], args_dict["DEST"], args_dict["SRC"]))
-
   assert "_size" not in args_dict.values()  # Avoid name clash
   application_before += (
-"""  int _size = -1;
+"""
+  int _size = -1;
 """)
 
   if args_dict["SIZE"]:
@@ -269,7 +261,6 @@ def cudaMemcpyExtraCode(args, isLogging):
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
     application_before += (
 """  %s
-  _direction = %s;
   if (_direction == cudaMemcpyHostToDevice ||
       _direction == cudaMemcpyHostToHost) {
     // Send source buffer to proxy process
@@ -277,7 +268,7 @@ def cudaMemcpyExtraCode(args, isLogging):
     // NOTE:  This assumes no pinnned memory.
     JASSERT(write(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
   }
-""" % (size_appl_send, args_dict["DIRECTION"], args_dict["SRC"]))
+""" % (size_appl_send, args_dict["SRC"]))
   # NOTE:  We should not be logging these large buggers.
   #   We should only log CUDA fnc'only with prim. args; e.g., not cudaMemcpy()
   application_before = application_before[:-1] # Remove last brace of '{...}'
@@ -333,14 +324,13 @@ def cudaMemcpyExtraCode(args, isLogging):
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
     application_after += (
 """  %s
-  _direction = %s;
   if (_direction == cudaMemcpyDeviceToHost ||
       _direction == cudaMemcpyHostToHost) {
     // Receive dest buffer from proxy process
     // NOTE:  This assumes no pinnned memory.
     JASSERT(read(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
   }
-""" % (size_appl_recv, args_dict["DIRECTION"], args_dict["DEST"]))
+""" % (size_appl_recv, args_dict["DEST"]))
 
   return (application_before, application_after, proxy_before, proxy_after)
   # End of 'cudaMemcpyExtraCode(args, isLogging)'
@@ -483,6 +473,24 @@ def write_cuda_bodies(fnc, args):
   int chars_rcvd = 0;
 
 """ % fnc["type"].replace("EXTERNC ", ""))
+
+  if [myarg for myarg in args if myarg["tag"][0] == "DIRECTION"]:
+    for myarg in args:
+      if myarg["tag"][0] == "DEST":
+        dest_var = myarg["name"]
+      elif myarg["tag"][0] == "SRC":
+        src_var = myarg["name"]
+      elif myarg["tag"][0] == "DIRECTION":
+        direction_var = myarg["name"]
+    cudawrappers_prolog += (
+"""  enum cudaMemcpyKind _direction;
+  if (%s == cudaMemcpyDefault) {
+    cudaMemcpyGetDirection(%s, %s, &_direction);
+    %s = _direction;
+  }
+
+""" % (direction_var, dest_var, src_var, direction_var))
+
   cudawrappers_epilog = (
 """
   log_append(strce_to_send);
@@ -522,7 +530,7 @@ def write_cuda_bodies(fnc, args):
 
   cudawrappers.write(cudawrappers_prolog)
   cudawrappers.write(
-"""  // Write the IN arguments to the proxy
+"""  // Write the IN arguments (and INOUT and IN_DEEPCOPY) to the proxy
   enum cuda_op op = OP_%s;
   memcpy(send_buf + chars_sent, &op, sizeof op);
   chars_sent += sizeof(enum cuda_op);
@@ -553,29 +561,26 @@ def write_cuda_bodies(fnc, args):
   #   since this is typically a pointer to a buffer in the application code.
   cudawrappers.write(application_before)
 
-  args_out_sizeof = [" + sizeof *" + arg["name"] for arg in args
+  sizeof_args = [" + sizeof *" + arg["name"] for arg in args
                                       if arg["tag"][0] in ["OUT", "INOUT"]]
-  args_out_sizeof = ''.join(args_out_sizeof)
-  if len(args_out_sizeof) >= 3:
-    args_out_sizeof = args_out_sizeof[3:]  # Remove initial " + "
+  sizeof_args = ''.join(sizeof_args)
+  if sizeof_args.startswith(" + "):
+    sizeof_args = sizeof_args[len(" + "):]
   cudawrappers.write(
 """
   // Receive the OUT arguments after the proxy made the function call
+  // Compute total chars_rcvd to be read in the next msg
 """)
-  if len(args_out_sizeof) > 0:
-    cudawrappers.write(
-"""  // Compute total chars_rcvd to be read in the next msg
-  chars_rcvd = """ + args_out_sizeof + """;
-  chars_rcvd += sizeof ret_val;
-  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
+  if len(sizeof_args) > 0:
+    cudawrappers.write("  chars_rcvd = %s + sizeof ret_val;\n" % sizeof_args)
+  else:
+    cudawrappers.write("  // (No primitive args to receive, except ret_val.)\n")
+  cudawrappers.write(
+"""  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
          (JASSERT_ERRNO);
 
   // Extract OUT variables
   chars_rcvd = 0;
-""")
-  else:
-    cudawrappers.write(
-"""  // No primitive arguments to receive.  Will not read args from skt_master.
 """)
   for arg in args:
     if arg["tag"][0] in ["OUT", "INOUT"]:

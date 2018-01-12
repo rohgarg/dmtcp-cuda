@@ -1,7 +1,5 @@
 TODO:
 
-Fix bug in generated cudaMemcpy code.  (Bug observed by Ones)
-
 cudaBindTexture2D - offset is :IN because the ptr might be NULL on input
         (meaning the output will not be set)
    I (Gene) had set it to :INOUT to capture that the ptr might be NULL
@@ -42,6 +40,7 @@ FIXED (as of Thurs., Jan. 11):
   ret_val was not being sent back from proxy to application
   Implemented :IN_BUF to properly handle cudaSetupArgument()
   Spurious declarations (warning: variable not used) is now fixed.
+  Fixed bugs in :DEST, :SRC (in auto-generated cudaMemcpy())
 
 FIXED (as of Mon.., Jan. 8):
   "EXTERNC" was appearing in body of functions; fixed
