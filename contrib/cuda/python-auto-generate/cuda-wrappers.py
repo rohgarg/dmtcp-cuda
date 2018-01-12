@@ -295,6 +295,8 @@ def cudaMemcpyExtraCode(args, isLogging):
     %s = malloc(_size);
     assert(read(skt_accept, %s, _size) == _size);
     // Get ready for receiving memory from device when making CUDA call
+  }
+  else if (_direction == cudaMemcpyDeviceToHost) {
     %s
     // NEEDED FOR DeviceToHost; SHOULD REUSE OLD malloc() for HostToHost
     // NOTE:  This assumes no pinnned memory.
@@ -320,6 +322,8 @@ def cudaMemcpyExtraCode(args, isLogging):
     // NOTE:  This assumes no pinnned memory.
     free(%s);
     assert(write(skt_accept, %s, _size) == _size);
+  }
+  else if (_direction == cudaMemcpyHostToDevice) {
     free(%s);
   }
 """ % (args_dict["SRC"], args_dict["DEST"],

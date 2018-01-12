@@ -51,8 +51,7 @@ default: auto-generate ${LIBNAME}.so
 
 auto-generate:
 	cd python-auto-generate && \
-	make && \
-	patch -p0 cudaproxy.icu < cudaproxy-cudaMemcpy.patch
+	make
 
 vi:
 	vim cuda-plugin.cpp

@@ -463,7 +463,7 @@ bool should_log_cuda_calls();
 void userfaultfd_initialize(void);
 void segvfault_initialize(void);
 void reset_uffd(void);
-void* create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo = NULL);
+void* create_shadow_pages(size_t size, void *remoteAddr = NULL);
 void unregister_all_pages();
 void register_all_pages();
 void flushDirtyPages();

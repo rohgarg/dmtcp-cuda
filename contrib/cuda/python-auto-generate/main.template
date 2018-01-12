@@ -159,6 +159,11 @@ EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)
 )
 
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaFree(void* pointer)
+)
+
 ## FIXME: This may need custom handling if pointer points to memory
 #    in proxy on host
 ## FIXME: for now it's generated verbatim.
@@ -582,4 +587,17 @@ cudaStreamCreate(:OUT cudaStream_t* pStream)
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaThreadExit(void)
+)
+
+CUDA_VERBATIM_PROXY(
+EXTERNC cudaError_t
+proxy_cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
+{
+  return cudaMallocManaged(pointer, size, flags);
+}
+)
+
+CUDA_WRAPPER(
+EXTERNC int
+proxy_cudaMallocManaged(:OUT void **pointer, size_t size, unsigned int flags)
 )

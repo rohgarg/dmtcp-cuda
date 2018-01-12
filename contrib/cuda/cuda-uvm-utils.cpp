@@ -70,7 +70,7 @@ allShadowRegions()
  * to the proxy and receiving data from the proxy.
  */
 static void
-monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
+monitor_pages(void *addr, size_t size, void *remoteAddr = NULL)
 {
 #ifdef USERFAULTFD
   struct uffdio_register uffdio_register;
@@ -86,17 +86,15 @@ monitor_pages(void *addr, size_t size, cudaSyscallStructure *remoteInfo = NULL)
   JASSERT(ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) != -1)(JASSERT_ERRNO);
 #endif
 
-  if (remoteInfo) {
+  if (remoteAddr) {
     // Save the location and size of the shadow region
     for (int i = 0; i < size / page_size; i++) {
-      ShadowRegion r =  {.addr = (void*)((uintptr_t)addr + i*page_size),
+      ShadowRegion r =  {.addr = (void*)((uintptr_t)addr + i * page_size),
                          .len = size,
                          .dirty = false};
       allShadowRegions().push_back(r);
       // Save the actual UVM region on the proxy
-      shadowPageMap()[addr] = (void*)((uintptr_t)remoteInfo->
-                                      syscall_type.cuda_malloc.pointer +
-                                      i * page_size);
+      shadowPageMap()[addr] = (void*)((uintptr_t)remoteAddr + i * page_size);
     }
   }
 }
@@ -218,10 +216,9 @@ flushDirtyPages()
  * by the page fault handler.
  */
 void*
-create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
+create_shadow_pages(size_t size, void *remoteAddr)
 {
   int npages = size / page_size + 1;
-  void *remoteAddr = remoteInfo->syscall_type.cuda_malloc.pointer;
 #ifdef USERFAULTFD
   void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
@@ -234,7 +231,7 @@ create_shadow_pages(size_t size, cudaSyscallStructure *remoteInfo)
 #endif
 
   JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-  monitor_pages(addr, npages * page_size, remoteInfo);
+  monitor_pages(addr, npages * page_size, remoteAddr);
   return addr;
 }
 
