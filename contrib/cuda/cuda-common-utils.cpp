@@ -27,6 +27,15 @@ int initialized = False;
 void *shmaddr = NULL;
 #endif
 
+// for pinned memory
+// #define PINNED_MEM_MAX_ALLOC 100
+typedef struct pseudoPinnedMem
+{
+  void *array[PINNED_MEM_MAX_ALLOC];
+  int index;
+} pseudoPinnedMem_t;
+pseudoPinnedMem_t pseudoPinnedMemArray = {array : {}, index : 0};
+
 // master socket
 int skt_master;
 
@@ -220,4 +229,30 @@ should_log_cuda_calls()
 {
   // TODO: Add locks for thread safety
   return enableCudaCallLogging;
+}
+
+// For pinned Memory
+void
+pseudoPinnedMem_append(void *ptr) {
+  pseudoPinnedMemArray.array[pseudoPinnedMemArray.index++] = ptr;
+
+  return;
+}
+
+bool
+is_pseudoPinnedMem(void *ptr) {
+  int index = pseudoPinnedMemArray.index;
+  for (int i=0; i <= index; ++i){
+    if (pseudoPinnedMemArray.array[pseudoPinnedMemArray.index] == ptr)
+      return true;
+  }
+
+  return false;
+}
+
+void
+pseudoPinnedMem_remove(void *ptr) {
+  pseudoPinnedMemArray.array[pseudoPinnedMemArray.index--] = ptr;
+
+  return;
 }

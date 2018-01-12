@@ -182,7 +182,6 @@ int compute(int fd, cudaSyscallStructure *structure)
   enum cudaMemcpyKind direction = (structure->syscall_type).cuda_memcpy.direction;
   size_t size = (structure->syscall_type).cuda_memcpy.size;
   void *new_source, *new_destination;
-
   switch (op)
   {
     //

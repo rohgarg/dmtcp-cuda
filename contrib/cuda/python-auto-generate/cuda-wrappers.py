@@ -383,6 +383,13 @@ cuda_include_head = (
 
 #define PYTHON_AUTO_GENERATE 1
 
+// for pinned memory
+#define PINNED_MEM_MAX_ALLOC 100
+// extern typedef struct pseudoPinnedMem pseudoPinnedMem_t;
+void pseudoPinnedMem_append(void *ptr);
+bool is_pseudoPinnedMem(void *ptr);
+void pseudoPinnedMem_remove(void *ptr);
+
 extern int skt_master;
 extern int skt_accept;
 extern int initialized;
