@@ -127,6 +127,33 @@ EXTERNC int
 proxy_example_fnc(:IN int arg1)
 )
 
+# CUDA_VERBATIM_PROXY(
+# EXTERNC cudaError_t
+# proxy_cudaFree_fnc(void *pointer) {
+#   // Make the function call
+#   printf("hello, ma'am\n");
+#   return cudaFree(pointer);
+# };
+# )
+#
+# CUDA_WRAPPER(
+# EXTERNC cudaError_t
+# proxy_cudaFree_fnc(void *pointer)
+# )
+#
+# CUDA_VERBATIM_WRAPPER(
+# EXTERNC cudaError_t
+# cudaFree(void *pointer) {
+#   if (is_pseudoPinnedMem(pointer)){
+#     pseudoPinnedMem_remove(pointer);
+#     return cudaSuccess;
+#   }
+#
+#   printf("hello, ma'am\n");
+#   return proxy_cudaFree_fnc(pointer);
+# };
+# )
+
 CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)
@@ -135,44 +162,45 @@ cudaMalloc(:OUT void **pointer, size_t size)
 ## FIXME: This may need custom handling if pointer points to memory
 #    in proxy on host
 ## FIXME: for now it's generated verbatim.
-CUDA_VERBATIM_WRAPPER(
-EXTERNC cudaError_t
-cudaFree(void* pointer) {
-  if (is_pseudoPinnedMem(pointer)){
-    pseudoPinnedMem_remove(pointer);
-    return cudaSuccess;
-  }
+# CUDA_VERBATIM_WRAPPER(
+# EXTERNC cudaError_t
+# cudaFree(void* pointer) {
+#   if (is_pseudoPinnedMem(pointer)){
+#     pseudoPinnedMem_remove(pointer);
+#     return cudaSuccess;
+#   }
+#
+#   if (!initialized)
+#     proxy_initialize();
+#
+#   cudaError_t ret_val;
+#   char send_buf[1000];
+#   char recv_buf[1000];
+#   int chars_sent = 0;
+#   int chars_rcvd = 0;
+#
+#   // Write the IN arguments to the proxy
+#   enum cuda_op op = OP_cudaFree;
+#   memcpy(send_buf + chars_sent, &op, sizeof op);
+#   chars_sent += sizeof(enum cuda_op);
+#   memcpy(send_buf + chars_sent, & pointer, sizeof pointer);
+#   chars_sent += sizeof pointer;
+#
+#   // Send op code and args to proxy
+#   JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
+#          (JASSERT_ERRNO);
+#
+#   // Receive the OUT arguments after the proxy made the function call
+#   // No primitive arguments to receive.  Will not read args from skt_master.
+#   chars_rcvd = sizeof ret_val;
+#   JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
+#          (JASSERT_ERRNO);
+#   memcpy(&ret_val, recv_buf + chars_rcvd, sizeof ret_val);
+#
+#   return ret_val;
+# };
+# )
 
-  if (!initialized)
-    proxy_initialize();
-
-  cudaError_t ret_val;
-  char send_buf[1000];
-  char recv_buf[1000];
-  int chars_sent = 0;
-  int chars_rcvd = 0;
-
-  // Write the IN arguments to the proxy
-  enum cuda_op op = OP_cudaFree;
-  memcpy(send_buf + chars_sent, &op, sizeof op);
-  chars_sent += sizeof(enum cuda_op);
-  memcpy(send_buf + chars_sent, & pointer, sizeof pointer);
-  chars_sent += sizeof pointer;
-
-  // Send op code and args to proxy
-  JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
-         (JASSERT_ERRNO);
-
-  // Receive the OUT arguments after the proxy made the function call
-  // No primitive arguments to receive.  Will not read args from skt_master.
-  chars_rcvd = sizeof ret_val;
-  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
-         (JASSERT_ERRNO);
-  memcpy(&ret_val, recv_buf + chars_rcvd, sizeof ret_val);
-
-  return ret_val;
-};
-)
 
 CUDA_WRAPPER(
 EXTERNC cudaError_t

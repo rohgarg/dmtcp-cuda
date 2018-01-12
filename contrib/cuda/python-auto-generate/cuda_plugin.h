@@ -27,6 +27,7 @@ void proxy_initialize();
 
 enum cuda_op {
   OP_proxy_example_fnc,
+  OP_proxy_cudaFree_fnc,
   OP_cudaMalloc,
   OP_cudaPointerGetAttributes,
   OP_cudaMemcpy,
@@ -77,6 +78,7 @@ enum cuda_op {
 };
 
 void FNC_proxy_example_fnc(void);
+void FNC_proxy_cudaFree_fnc(void);
 void FNC_cudaMalloc(void);
 void FNC_cudaPointerGetAttributes(void);
 void FNC_cudaMemcpy(void);
