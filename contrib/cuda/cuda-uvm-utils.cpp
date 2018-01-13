@@ -39,6 +39,7 @@ struct ShadowRegion {
   void *addr;
   size_t len;
   bool dirty;
+  int prot;
 };
 
 // Private functions
@@ -65,6 +66,24 @@ allShadowRegions()
   return *instance;
 }
 
+/*
+ * Change the permissions on the given memory address range
+ */
+static void
+reregister_page(void *addr, size_t len, int prot = PROT_NONE)
+{
+#ifdef USERFAULTFD
+  JASSERT(munmap(addr, len) == 0)(JASSERT_ERRNO);
+  void *newaddr = mmap(addr, len, PROT_READ | PROT_WRITE,
+                    MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+  JASSERT(newaddr != MAP_FAILED)(JASSERT_ERRNO);
+  monitor_pages(addr, len);
+#else
+  JASSERT(mprotect(addr, len, prot) != -1)(JASSERT_ERRNO);
+#endif
+}
+
 /* This works for both userfaultfd-based and segfault handler-based implementations.
  *
  * In the case of the former, it adds the shadow page to the UFFD managed regions.
@@ -74,7 +93,8 @@ allShadowRegions()
  * to the proxy and receiving data from the proxy.
  */
 static void
-monitor_pages(void *addr, size_t size, void *remoteAddr = NULL)
+monitor_pages(void *addr, size_t size,
+              void *remoteAddr = NULL, int prot = PROT_NONE)
 {
 #ifdef USERFAULTFD
   struct uffdio_register uffdio_register;
@@ -95,7 +115,8 @@ monitor_pages(void *addr, size_t size, void *remoteAddr = NULL)
     for (int i = 0; i < size / page_size; i++) {
       ShadowRegion r =  {.addr = (void*)((uintptr_t)addr + i * page_size),
                          .len = size,
-                         .dirty = false};
+                         .dirty = false,
+                         .prot = prot};
       allShadowRegions().push_back(r);
       // Save the actual UVM region on the proxy
       shadowPageMap()[addr] = (void*)((uintptr_t)remoteAddr + i * page_size);
@@ -173,8 +194,8 @@ flushDirtyPages()
       reregister_page(it->addr, it->len);
 #else
       // Reset the permissions on the pages.
-      JASSERT(mprotect(it->addr, it->len, PROT_NONE) == 0)
-             (JASSERT_ERRNO)(it->addr).Text("Could not reset perms on page");
+      reregister_page(it->addr, it->len, PROT_NONE);
+      it->prot = PROT_NONE;
 #endif
       it->dirty = false;
     }
@@ -191,6 +212,7 @@ void*
 create_shadow_pages(size_t size, void *remoteAddr)
 {
   int npages = size / page_size + 1;
+  int prot = PROT_NONE;
 #ifdef USERFAULTFD
   void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
@@ -198,12 +220,12 @@ create_shadow_pages(size_t size, void *remoteAddr)
   // Ideally, we should start with PROT_WRITE, but PROT_WRITE also gives the
   // page read permissions. So, for safety and simplicity, we start with
   // PROT_NONE.
-  void *addr = mmap(remoteAddr, npages * page_size, PROT_NONE, // | PROT_WRITE,
+  void *addr = mmap(remoteAddr, npages * page_size, prot, // | PROT_WRITE,
                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
 #endif
 
   JASSERT(addr != MAP_FAILED)(remoteAddr)(JASSERT_ERRNO);
-  monitor_pages(addr, npages * page_size, remoteAddr);
+  monitor_pages(addr, npages * page_size, remoteAddr, prot);
   return addr;
 }
 
@@ -300,52 +322,6 @@ fault_handler_thread(void *arg)
     JASSERT(ioctl(uffd, UFFDIO_COPY, &uffdio_copy) != -1)(JASSERT_ERRNO);
 
     JTRACE("uffdio_copy.copy returned ")(uffdio_copy.copy);
-  }
-}
-
-
-static void
-reregister_page(void *addr, size_t len)
-{
-  JASSERT(munmap(addr, len) == 0)(JASSERT_ERRNO);
-  void *newaddr = mmap(addr, len, PROT_READ | PROT_WRITE,
-                    MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-  JASSERT(newaddr != MAP_FAILED)(JASSERT_ERRNO);
-  monitor_pages(addr, len);
-}
-
-// Public functions
-
-void
-unregister_all_pages()
-{
-  struct uffdio_range uffdio_range;
-
-  dmtcp::vector<ShadowRegion>::iterator it;
-  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
-    uffdio_range.start = (uintptr_t)it->addr;
-    uffdio_range.len = it->len;
-    JTRACE("unregister region")(it->addr)(it->len);
-
-    JASSERT(ioctl(uffd, UFFDIO_UNREGISTER, &uffdio_range) != -1)(JASSERT_ERRNO);
-  }
-}
-
-void
-register_all_pages()
-{
-  struct uffdio_register uffdio_register;
-
-  dmtcp::vector<ShadowRegion>::iterator it;
-  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
-    /*
-     * NOTE: For some reason, uffd doesn't re-register the page, without
-     *       first munmaping it!  Arguably, this is a kernel bug.
-     *
-     * FIXME: We need to copy/restore the data on these pages
-     */
-    reregister_page(it->addr, it->len);
   }
 }
 
@@ -458,6 +434,48 @@ reset_uffd(void)
  ***********************************************************/
 
 
+// Public functions
+
+void
+unregister_all_pages()
+{
+#ifdef USERFAULTFD
+  struct uffdio_range uffdio_range;
+#endif
+
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+#ifdef USERFAULTFD
+    uffdio_range.start = (uintptr_t)it->addr;
+    uffdio_range.len = it->len;
+    JTRACE("unregister region")(it->addr)(it->len);
+
+    JASSERT(ioctl(uffd, UFFDIO_UNREGISTER, &uffdio_range) != -1)(JASSERT_ERRNO);
+#else
+    // Give RW permissions at checkpoint time to allow DMTCP to copy the data
+    // to the ckpt img
+    JASSERT(mprotect(it->addr, it->len, PROT_READ | PROT_WRITE) != -1)
+           (JASSERT_ERRNO);
+#endif
+  }
+}
+
+void
+register_all_pages()
+{
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    /*
+     * NOTE: For some reason, uffd doesn't re-register the page, without
+     *       first munmaping it!  Arguably, this is a kernel bug.
+     *
+     * FIXME: We need to copy/restore the data on these pages
+     */
+    reregister_page(it->addr, it->len, it->prot);
+  }
+}
+
+
 // # define _GNU_SOURCE
 # include <signal.h>
 
@@ -536,17 +554,15 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
     // be an issue where an application writes and then reads, for example, in
     // case of an application that writes to a page and then waits for an
     // already running kernel to update the page.
-    JASSERT(mprotect(faultingPage, page_size, PROT_WRITE) == 0)
-           (JASSERT_ERRNO)(addr).Text("Could not add write perms to the page");
+    reregister_page(faultingPage, page_size, PROT_WRITE);
   } else {
     // change the permission in the corresponding mem region.
     // FIXME (see above)
     // XXX: Temporarily give write permissions to read in data from the proxy
-    JASSERT(mprotect(faultingPage, page_size, PROT_READ | PROT_WRITE) == 0)
-           (JASSERT_ERRNO)(addr).Text("Could not add read perms to the page");
+    reregister_page(faultingPage, page_size, PROT_READ | PROT_WRITE);
     receiveDataFromProxy(faultingPage, page_addr, page_size);
     // XXX: Remove the WRITE permissions
-    JASSERT(mprotect(faultingPage, page_size, PROT_READ) == 0);
+    reregister_page(faultingPage, page_size, PROT_READ);
   }
   fault_cnt++;
 

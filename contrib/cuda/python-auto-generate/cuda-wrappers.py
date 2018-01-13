@@ -579,11 +579,6 @@ def write_cuda_bodies(fnc, args):
   JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
          (JASSERT_ERRNO);
 """)
-  # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
-  if (fnc["isLogging"]):
-    cudawrappers.write(
-"""  log_append(send_buf, chars_sent);
-""")
   # This occurs before we send to the proxy process because
   #   application_before does not use send_buf.  It does its own send,
   #   since this is typically a pointer to a buffer in the application code.
@@ -604,13 +599,15 @@ def write_cuda_bodies(fnc, args):
   else:
     cudawrappers.write("  // (No primitive args to receive, except ret_val.)\n")
     cudawrappers.write("  chars_rcvd = sizeof ret_val;\n")
+  # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
+  logging_line = "\n  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);\n" if fnc["isLogging"] else ""
   cudawrappers.write(
 """  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
          (JASSERT_ERRNO);
-
+  %s
   // Extract OUT variables
   chars_rcvd = 0;
-""")
+""" % logging_line)
   for arg in args:
     if arg["tag"][0] in ["OUT", "INOUT"]:
       (var, size) = (arg["name"], "sizeof *" + arg["name"])

@@ -29,8 +29,47 @@ allMallocRegions()
 }
 
 void
+create_copy_of_data_on_host(CudaCallLog_t *l)
+{
+  enum cuda_op op;
+  memcpy(&op, l->fncargs, sizeof op);
+  if (op == OP_cudaMalloc) {
+    size_t len;
+    void *devPtr;
+    memcpy(&len, l->fncargs + sizeof op, sizeof len);
+    memcpy(&devPtr, l->results, sizeof devPtr);
+    void *page = mmap(NULL, len, PROT_READ | PROT_WRITE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    JASSERT(page != MAP_FAILED)(JASSERT_ERRNO);
+    l->host_addr = page;
+    cudaMemcpy(page, devPtr, len, cudaMemcpyDeviceToHost);
+  }
+}
+
+void
+send_saved_data_to_device(CudaCallLog_t *l)
+{
+  enum cuda_op op;
+  memcpy(&op, l->fncargs, sizeof op);
+  if (op == OP_cudaMalloc) {
+    size_t len;
+    void *devPtr;
+    memcpy(&len, l->fncargs + sizeof op, sizeof len);
+    memcpy(&devPtr, l->results, sizeof devPtr);
+    void *newDevPtr = NULL;
+    cudaError_t ret = cudaMalloc(&newDevPtr, len);
+    JASSERT(ret == cudaSuccess && newDevPtr == devPtr);
+    JASSERT(l->host_addr != NULL);
+    cudaMemcpy(devPtr, l->host_addr, len, cudaMemcpyHostToDevice);
+  }
+}
+
+void
 copy_data_to_host()
 {
+#ifdef PYTHON_AUTO_GENERATE
+  logs_read_and_apply(create_copy_of_data_on_host);
+#else
   dmtcp::vector<MallocRegion>::iterator it;
   for (it = allMallocRegions().begin(); it != allMallocRegions().end(); it++) {
     void *page = mmap(NULL, it->len, PROT_READ | PROT_WRITE,
@@ -39,15 +78,20 @@ copy_data_to_host()
     it->host_addr = page;
     cudaMemcpy(page, it->addr, it->len, cudaMemcpyDeviceToHost);
   }
+#endif
 }
 
 void
 copy_data_to_device()
 {
+#ifdef PYTHON_AUTO_GENERATE
+  logs_read_and_apply(send_saved_data_to_device);
+#else
   dmtcp::vector<MallocRegion>::iterator it;
   for (it = allMallocRegions().begin(); it != allMallocRegions().end(); it++) {
     cudaMemcpy(it->addr, it->host_addr, it->len, cudaMemcpyHostToDevice);
   }
+#endif
 }
 
 //================================================================

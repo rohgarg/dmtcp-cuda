@@ -449,11 +449,21 @@ void send_recv(int fd, cudaSyscallStructure *strce_to_send,
 void log_append(cudaSyscallStructure record);
 bool log_read(cudaSyscallStructure *record);
 #else
+
+struct CudaCallLog_t {
+  void *fncargs;
+  size_t size;
+  void *results;
+  size_t resSize;
+  void *host_addr;   // Valid only for a cudaMalloc region
+};
+
 // Just for testing purpose. Otherwise this function is obsolete.
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);
-void log_append(void *ptr, size_t size);
-void * log_read(size_t *size);
+void logs_read_and_apply(void (*apply)(CudaCallLog_t *l));
+void log_append(void *ptr, size_t size,
+                void *results, size_t resSize);
 #endif
 
 void disable_cuda_call_logging();

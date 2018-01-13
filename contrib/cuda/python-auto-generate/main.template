@@ -152,7 +152,7 @@ cudaFree(void *pointer) {
 };
 )
 
-CUDA_WRAPPER(
+CUDA_WRAPPER_WITH_LOGGING(
 EXTERNC cudaError_t
 cudaMalloc(:OUT void **pointer, size_t size)
 )
@@ -595,7 +595,7 @@ proxy_cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
 }
 )
 
-CUDA_WRAPPER(
+CUDA_WRAPPER_WITH_LOGGING(
 EXTERNC cudaError_t
 proxy_cudaMallocManaged(:OUT void **pointer, size_t size, unsigned int flags)
 )
