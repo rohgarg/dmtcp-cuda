@@ -1,0 +1,10 @@
+1. Add log and replay logic for checkpoint-restart
+   Most of the code is already exists; just need to integrate and test
+
+2. Add explicit code for the state machine for UVM-shadow pages.
+   The state machine has three states: RW, CUDACall, and RO.
+   Direct transition from RW to RO should generate an assert/warning.
+
+3. Add more test cases for different cuda calls; especially cudaMemcpy2d, cudaArray*
+
+4. Add(?) and verify support for pinned memory
