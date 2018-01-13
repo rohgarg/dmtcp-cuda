@@ -431,10 +431,16 @@ int main() {
 }
 
 void do_work() {
+  int ret = -1;
   while(1) {
     enum cuda_op op;
 
-    assert(read(skt_accept, &op, sizeof op) == sizeof op);
+    ret = read(skt_accept, &op, sizeof op);
+    if (ret == 0 || ret == -1) {
+      exit(0);
+    } else {
+      assert(ret == sizeof op);
+    }
     switch (op) {
 """)
 cudaproxy.write(cudaproxy_head)
