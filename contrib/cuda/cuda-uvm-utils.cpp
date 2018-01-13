@@ -157,9 +157,11 @@ markDirtyRegion(void *page)
 void
 flushDirtyPages()
 {
-  if (!haveDirtyPages) return;
+  static bool inTheMiddleOfFlushing = false;
+  if (!haveDirtyPages || inTheMiddleOfFlushing) return;
 
   JTRACE("Flushing all dirty pages");
+  inTheMiddleOfFlushing = true;
   dmtcp::vector<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
     if (it->dirty) {
@@ -177,6 +179,7 @@ flushDirtyPages()
       it->dirty = false;
     }
   }
+  inTheMiddleOfFlushing = false;
   haveDirtyPages = false;
 }
 

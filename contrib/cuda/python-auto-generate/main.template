@@ -276,7 +276,7 @@ EXTERNC cudaError_t
 cudaSetupArgument(:IN_BUF const void *arg, :SIZE size_t size, size_t offset)
 )
 
-CUDA_WRAPPER_WITH_UVM_SYNC(
+CUDA_WRAPPER(
 EXTERNC cudaError_t
 cudaLaunch(const void *func)
 )
