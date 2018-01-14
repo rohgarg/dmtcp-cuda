@@ -114,7 +114,7 @@ monitor_pages(void *addr, size_t size,
     // Save the location and size of the shadow region
     for (int i = 0; i < size / page_size; i++) {
       ShadowRegion r =  {.addr = (void*)((uintptr_t)addr + i * page_size),
-                         .len = size,
+                         .len = page_size,
                          .dirty = false,
                          .prot = prot};
       allShadowRegions().push_back(r);
@@ -211,7 +211,8 @@ flushDirtyPages()
 void*
 create_shadow_pages(size_t size, void *remoteAddr)
 {
-  int npages = size / page_size + 1;
+  int npages = (size % page_size == 0) ?
+               (size / page_size) : (size / page_size + 1);
   int prot = PROT_NONE;
 #ifdef USERFAULTFD
   void *addr = mmap(remoteAddr, npages * page_size, PROT_READ | PROT_WRITE,
