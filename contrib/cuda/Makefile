@@ -7,7 +7,7 @@ NAME=${shell basename $$PWD}
 LIBNAME=libdmtcp_${NAME}.so
 
 # As you add new files to your hijack library, add the object file names here.
-LIBOBJS = cuda-plugin.o cuda-wrappers.o cuda-common-utils.o cuda-uvm-utils.o cuda-uvm-wrappers.o
+LIBOBJS = cuda-plugin.o cuda-wrappers.o cuda-common-utils.o cuda-uvm-utils.o cuda-uvm-wrappers.o log_append_and_read.o
 
 AUTO_GENERATE_FILES = python-auto-generate/cudawrappers.icpp \
 	python-auto-generate/cudaproxy.icpp
