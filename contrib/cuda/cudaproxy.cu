@@ -55,6 +55,29 @@ readAll(int fd, void *buf, size_t count)
   return num_read;
 }
 
+EXTERNC ssize_t
+writeAll(int fd, const void *buf, size_t count)
+{
+  const char *ptr = (const char *)buf;
+  size_t num_written = 0;
+
+  do {
+    ssize_t rc = write(fd, ptr + num_written, count - num_written);
+    if (rc == -1) {
+      if (errno == EINTR || errno == EAGAIN) {
+        continue;
+      } else {
+        return rc;
+      }
+    } else if (rc == 0) {
+      break;
+    } else { // else rc > 0
+      num_written += rc;
+    }
+  } while (num_written < count);
+  return num_written;
+}
+
 #ifdef PYTHON_AUTO_GENERATE
 # include "python-auto-generate/cudaproxy.icu"
 #endif

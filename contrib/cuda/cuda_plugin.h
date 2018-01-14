@@ -459,6 +459,7 @@ struct CudaCallLog_t {
 };
 
 EXTERNC ssize_t readAll(int fd, void *buf, size_t count);
+EXTERNC ssize_t writeAll(int fd, const void *buf, size_t count);
 
 // Just for testing purpose. Otherwise this function is obsolete.
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,

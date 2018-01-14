@@ -212,7 +212,7 @@ def cudaMemcpyExtraCode(args, isLogging):
 
   if args_dict["IN_BUF"]:  # if "IN_BUF" and "SIZE" exist
     application_before += (
-"""  JASSERT(write(skt_master, %s, %s) == %s) (JASSERT_ERRNO);
+"""  JASSERT(writeAll(skt_master, %s, %s) == %s) (JASSERT_ERRNO);
 """ % (args_dict["IN_BUF"], args_dict["SIZE"], args_dict["SIZE"]))
     proxy_before += (
 """  // Allocate memory for IN_BUF arguments and receive data
@@ -270,7 +270,7 @@ def cudaMemcpyExtraCode(args, isLogging):
     // Send source buffer to proxy process
     // NOTE: As an optimization, HostToHost could be done locally.
     // NOTE:  This assumes no pinnned memory.
-    JASSERT(write(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
+    JASSERT(writeAll(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
   }
 """ % (size_appl_send, args_dict["SRC"]))
   # NOTE:  We should not be logging these large buggers.
@@ -320,7 +320,7 @@ def cudaMemcpyExtraCode(args, isLogging):
       _direction == cudaMemcpyHostToHost) {
     // Send  dest buffer to application process
     // NOTE:  This assumes no pinnned memory.
-    assert(write(skt_accept, %s, _size) == _size);
+    assert(writeAll(skt_accept, %s, _size) == _size);
     free(%s);
   }
   else if (_direction == cudaMemcpyHostToDevice) {
@@ -576,7 +576,7 @@ def write_cuda_bodies(fnc, args):
   cudawrappers.write(
 """
   // Send op code and args to proxy
-  JASSERT(write(skt_master, send_buf, chars_sent) == chars_sent)
+  JASSERT(writeAll(skt_master, send_buf, chars_sent) == chars_sent)
          (JASSERT_ERRNO);
 """)
   # This occurs before we send to the proxy process because
@@ -723,7 +723,7 @@ def write_cuda_bodies(fnc, args):
   chars_sent += sizeof ret_val;
 """)
   cudaproxy2.write(
-"""  assert(write(skt_accept, send_buf, chars_sent) == chars_sent);
+"""  assert(writeAll(skt_accept, send_buf, chars_sent) == chars_sent);
 """)
   # This occurs after we send to the application process, because
   #   application_after is not using the send_buf.  It does its own send, since
