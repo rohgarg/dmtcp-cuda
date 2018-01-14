@@ -102,6 +102,30 @@ void proxy_initialize(void)
   initialized = True;
 }
 
+EXTERNC ssize_t
+readAll(int fd, void *buf, size_t count)
+{
+  ssize_t rc;
+  char *ptr = (char *)buf;
+  size_t num_read = 0;
+
+  for (num_read = 0; num_read < count;) {
+    rc = read(fd, ptr + num_read, count - num_read);
+    if (rc == -1) {
+      if (errno == EINTR || errno == EAGAIN) {
+        continue;
+      } else {
+        return -1;
+      }
+    } else if (rc == 0) {
+      break;
+    } else { // else rc > 0
+      num_read += rc;
+    }
+  }
+  return num_read;
+}
+
 #ifndef PYTHON_AUTO_GENERATE
     // Old non-auto-generated version
 // open the log file and

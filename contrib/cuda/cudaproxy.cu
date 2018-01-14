@@ -31,6 +31,30 @@
 # endif // ifdef __cplusplus
 #endif // ifndef EXTERNC
 
+EXTERNC ssize_t
+readAll(int fd, void *buf, size_t count)
+{
+  ssize_t rc;
+  char *ptr = (char *)buf;
+  size_t num_read = 0;
+
+  for (num_read = 0; num_read < count;) {
+    rc = read(fd, ptr + num_read, count - num_read);
+    if (rc == -1) {
+      if (errno == EINTR || errno == EAGAIN) {
+        continue;
+      } else {
+        return -1;
+      }
+    } else if (rc == 0) {
+      break;
+    } else { // else rc > 0
+      num_read += rc;
+    }
+  }
+  return num_read;
+}
+
 #ifdef PYTHON_AUTO_GENERATE
 # include "python-auto-generate/cudaproxy.icu"
 #endif
@@ -47,6 +71,7 @@ static int compute(int fd, cudaSyscallStructure *structure);
 #endif
 int skt_accept;
 static int start_proxy(void);
+
 
 // This is the trampoline destination for the user main; this does not return
 // to the user main function.

@@ -458,6 +458,8 @@ struct CudaCallLog_t {
   void *host_addr;   // Valid only for a cudaMalloc region
 };
 
+EXTERNC ssize_t readAll(int fd, void *buf, size_t count);
+
 // Just for testing purpose. Otherwise this function is obsolete.
 void send_recv(int fd, cudaSyscallStructure *strce_to_send,
               cudaSyscallStructure *rcvd_strce, cudaError_t *ret_val);

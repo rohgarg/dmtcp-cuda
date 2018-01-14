@@ -217,7 +217,7 @@ def cudaMemcpyExtraCode(args, isLogging):
     proxy_before += (
 """  // Allocate memory for IN_BUF arguments and receive data
   %s = malloc(%s);
-  assert(read(skt_accept, %s, %s) == %s);
+  assert(readAll(skt_accept, %s, %s) == %s);
 """ % (args_dict["IN_BUF"], args_dict["SIZE"],
        args_dict["IN_BUF"], args_dict["SIZE"], args_dict["SIZE"]))
     proxy_after += (
@@ -293,7 +293,7 @@ def cudaMemcpyExtraCode(args, isLogging):
       _direction == cudaMemcpyHostToHost) {
     // Receive source buffer from application process
     %s = malloc(_size);
-    assert(read(skt_accept, %s, _size) == _size);
+    assert(readAll(skt_accept, %s, _size) == _size);
     // Get ready for receiving memory from device when making CUDA call
   }
   else if (_direction == cudaMemcpyDeviceToHost) {
@@ -336,7 +336,7 @@ def cudaMemcpyExtraCode(args, isLogging):
       _direction == cudaMemcpyHostToHost) {
     // Receive dest buffer from proxy process
     // NOTE:  This assumes no pinnned memory.
-    JASSERT(read(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
+    JASSERT(readAll(skt_master, %s, _size) == _size) (JASSERT_ERRNO);
   }
 """ % (size_appl_recv, args_dict["DEST"]))
 
@@ -602,7 +602,7 @@ def write_cuda_bodies(fnc, args):
   # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
   logging_line = "\n  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);\n" if fnc["isLogging"] else ""
   cudawrappers.write(
-"""  JASSERT(read(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
+"""  JASSERT(readAll(skt_master, recv_buf, chars_rcvd) == chars_rcvd)
          (JASSERT_ERRNO);
   %s
   // Extract OUT variables
