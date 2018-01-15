@@ -1,10 +1,34 @@
 1. Add log and replay logic for checkpoint-restart
    Most of the code is already exists; just need to integrate and test
 
+   + Done
+
 2. Add explicit code for the state machine for UVM-shadow pages.
    The state machine has three states: RW, CUDACall, and RO.
    Direct transition from RW to RO should generate an assert/warning.
 
-3. Add more test cases for different cuda calls; especially cudaMemcpy2d, cudaArray*
+3. Add more test cases for different cuda calls; especially cudaMemcpy2d, cudaArray
 
 4. Add(?) and verify support for pinned memory
+
+5. Test Rodinia benchmarks
+
+   + Done 11/25
+
+6. Test HPGMG benchmark
+
+   + Done
+
+7. Test HPGMG with MPI
+
+   + Done with up to 4 ranks
+
+8. Test ckpt-restart for Rodinia
+
+9. Add code for ckpt-restart of UVM
+
+10. Test ckpt-restart of HPGMG
+
+11. Fix Rodinia benchmarks for compilation on discovery
+
+    + Done
