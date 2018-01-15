@@ -34,6 +34,12 @@ cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
   JASSERT(ret_val == cudaSuccess)\
          (ret_val).Text("Failed to create UVM region");
 
+  if (*pointer == NULL) {
+    JTRACE("UVM pointer is NULL. Perhaps the size was 0?")
+          (*pointer)(size)(flags);
+    return ret_val;
+  }
+
   // change the pointer to point the global memory (device memory)
   *pointer = create_shadow_pages(size, *pointer);
 
