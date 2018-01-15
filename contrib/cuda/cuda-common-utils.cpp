@@ -48,13 +48,17 @@ bool enableCudaCallLogging = true;
 // initialize the proxy
 void proxy_initialize(void)
 {
+  // char sktname[10] = {0};
+  // snprintf(sktname, 10, "%s%d", SKTNAME, rand()%9);
+  char *sktname = tmpnam(NULL);
+  JNOTE("using socket")(sktname);
   memset(&sa_proxy, 0, sizeof(sa_proxy));
-  strcpy(sa_proxy.sun_path, SKTNAME);
+  strcpy(sa_proxy.sun_path, sktname);
   sa_proxy.sun_family = AF_UNIX;
   char *const args[] = {const_cast<char*>("../../bin/dmtcp_nocheckpoint"),
                         const_cast<char*>(dmtcp::ProcessInfo::instance()
                                .procSelfExe().c_str()),
-                        const_cast<char*>(SKTNAME),
+                        const_cast<char*>(sktname),
                         NULL}; // FIXME: Compiler warning
 
   switch (_real_fork()) {
@@ -63,7 +67,7 @@ void proxy_initialize(void)
 
     case 0:
       setenv(ENV_VAR_ORIG_LD_PRELOAD, "./libcudaproxy.so", 1);
-      setenv("CUDA_PROXY_SOCKET", "./proxy", 1);
+      setenv("CUDA_PROXY_SOCKET", sktname, 1);
       JASSERT(execvp((const char*)args[0], args) != -1)(JASSERT_ERRNO)
              .Text("Failed to exec cudaproxy");
   }
