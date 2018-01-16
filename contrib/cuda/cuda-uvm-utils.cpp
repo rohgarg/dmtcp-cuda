@@ -66,6 +66,20 @@ allShadowRegions()
   return *instance;
 }
 
+#ifndef PER_PAGE_FAULTS
+static
+ShadowRegion *getShadowRegionForAddr(void *addr)
+{
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    if (addr >= it->addr && addr < it->addr + it->len) {
+      return &(*it);
+    }
+  }
+  return NULL;
+}
+#endif
+
 /*
  * Change the permissions on the given memory address range
  */
@@ -104,7 +118,7 @@ monitor_pages(void *addr, size_t size,
   uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
 #endif
 
-  JNOTE("register region")(addr)(size);
+  JTRACE("register region")(addr)(size);
 
 #ifdef USERFAULTFD
   JASSERT(ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) != -1)(JASSERT_ERRNO);
@@ -112,6 +126,7 @@ monitor_pages(void *addr, size_t size,
 
   if (remoteAddr) {
     // Save the location and size of the shadow region
+#ifdef PER_PAGE_FAULTS
     for (int i = 0; i < size / page_size; i++) {
       ShadowRegion r =  {.addr = (void*)((uintptr_t)addr + i * page_size),
                          .len = page_size,
@@ -121,6 +136,15 @@ monitor_pages(void *addr, size_t size,
       // Save the actual UVM region on the proxy
       shadowPageMap()[addr] = (void*)((uintptr_t)remoteAddr + i * page_size);
     }
+#else
+      ShadowRegion r =  {.addr = addr,
+                         .len = size,
+                         .dirty = false,
+                         .prot = prot};
+      allShadowRegions().push_back(r);
+      // Save the actual UVM region on the proxy
+      shadowPageMap()[addr] = remoteAddr;
+#endif
   }
 }
 
@@ -506,6 +530,7 @@ segvfault_initialize(void)
   segvfault_initialized = True;
 }
 
+
 void
 segvfault_handler(int signum, siginfo_t *siginfo, void *context)
 {
@@ -517,6 +542,11 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
   }
   void *page_addr = (void *)(((long long unsigned)addr >> SHIFT) << SHIFT);
   void *faultingPage = getAlignedAddress((uintptr_t)addr, page_size);
+
+#ifndef PER_PAGE_FAULTS
+  ShadowRegion *faultingRegion = getShadowRegionForAddr(faultingPage);
+  JASSERT(faultingRegion != NULL);
+#endif
 
   // Find out if this is a write fault.  (Otherwise, it's a read fault.)
   JASSERT(siginfo->si_code == SEGV_ACCERR);
@@ -547,7 +577,12 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
 
   if (is_write_fault) {
     // We mark the region as dirty for flushing at a later sync point
+#ifdef PER_PAGE_FAULTS
     markDirtyRegion(faultingPage);
+#else
+    faultingRegion->dirty = true;
+    haveDirtyPages = true;
+#endif
     // change the permission in the corresponding mem region.
     // FIXME (see above)
 
@@ -555,15 +590,28 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
     // be an issue where an application writes and then reads, for example, in
     // case of an application that writes to a page and then waits for an
     // already running kernel to update the page.
+#ifdef PER_PAGE_FAULTS
     reregister_page(faultingPage, page_size, PROT_WRITE);
+#else
+    reregister_page(faultingRegion->addr, faultingRegion->len, PROT_WRITE);
+#endif
   } else {
     // change the permission in the corresponding mem region.
     // FIXME (see above)
     // XXX: Temporarily give write permissions to read in data from the proxy
+#ifdef PER_PAGE_FAULTS
     reregister_page(faultingPage, page_size, PROT_READ | PROT_WRITE);
     receiveDataFromProxy(faultingPage, page_addr, page_size);
     // XXX: Remove the WRITE permissions
     reregister_page(faultingPage, page_size, PROT_READ);
+#else
+    reregister_page(faultingRegion->addr, faultingRegion->len,
+                    PROT_READ | PROT_WRITE);
+    receiveDataFromProxy(faultingRegion->addr, faultingRegion->addr,
+                         faultingRegion->len);
+    // XXX: Remove the WRITE permissions
+    reregister_page(faultingRegion->addr, faultingRegion->len, PROT_READ);
+#endif
   }
   fault_cnt++;
 
