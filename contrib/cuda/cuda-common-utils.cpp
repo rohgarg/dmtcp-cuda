@@ -50,7 +50,7 @@ void proxy_initialize(void)
 {
   // char sktname[10] = {0};
   // snprintf(sktname, 10, "%s%d", SKTNAME, rand()%9);
-  char *sktname = tmpnam(NULL);
+  const char *sktname = SKTNAME; // tmpnam(NULL)
   JNOTE("using socket")(sktname);
   memset(&sa_proxy, 0, sizeof(sa_proxy));
   strcpy(sa_proxy.sun_path, sktname);
@@ -61,6 +61,7 @@ void proxy_initialize(void)
                         const_cast<char*>(sktname),
                         NULL}; // FIXME: Compiler warning
 
+  setenv("CUDA_PROXY_SOCKET", sktname, 1);
   switch (_real_fork()) {
     case -1:
       JASSERT(false)(JASSERT_ERRNO).Text("Failed to fork cudaproxy");
