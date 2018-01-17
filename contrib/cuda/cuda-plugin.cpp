@@ -55,6 +55,7 @@ static void
 pre_ckpt()
 {
   unregister_all_pages();
+  disable_shadow_page_flushing();
   copy_data_to_host();
   // enum cuda_op tmp = OP_LAST_FNC;
   // log_append(&tmp, sizeof tmp);
@@ -64,6 +65,7 @@ static void
 resume()
 {
   register_all_pages();
+  enable_shadow_page_flushing();
 }
 
 #define LOG_READ_BUF_SIZE 1000
