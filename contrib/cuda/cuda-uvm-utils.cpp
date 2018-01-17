@@ -35,13 +35,6 @@ proxy_cudaMallocManagedMemcpy(void *dst, void *src,
 
 // Private global vars
 
-struct ShadowRegion {
-  void *addr;
-  size_t len;
-  bool dirty;
-  int prot;
-};
-
 // Private functions
 
 static dmtcp::map<void*, void*>&
@@ -65,20 +58,6 @@ allShadowRegions()
   }
   return *instance;
 }
-
-#ifndef PER_PAGE_FAULTS
-static
-ShadowRegion *getShadowRegionForAddr(void *addr)
-{
-  dmtcp::vector<ShadowRegion>::iterator it;
-  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
-    if (addr >= it->addr && addr < it->addr + it->len) {
-      return &(*it);
-    }
-  }
-  return NULL;
-}
-#endif
 
 /*
  * Change the permissions on the given memory address range
@@ -189,10 +168,36 @@ markDirtyRegion(void *page)
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
     if (it->addr == page) {
       it->dirty = true;
-      haveDirtyPages = true;
+      enable_shadow_page_flushing();
       return;
     }
   }
+}
+
+// Global functions
+
+ShadowRegion*
+getShadowRegionForAddr(void *addr)
+{
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    if (addr >= it->addr && addr < it->addr + it->len) {
+      return &(*it);
+    }
+  }
+  return NULL;
+}
+
+void
+disable_shadow_page_flushing()
+{
+  haveDirtyPages = false;
+}
+
+void
+enable_shadow_page_flushing()
+{
+  haveDirtyPages = true;
 }
 
 /* NOTE: This function sends all the dirty pages to the proxy process. This
@@ -225,7 +230,7 @@ flushDirtyPages()
     }
   }
   inTheMiddleOfFlushing = false;
-  haveDirtyPages = false;
+  disable_shadow_page_flushing();
 }
 
 /*
@@ -581,7 +586,9 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
     markDirtyRegion(faultingPage);
 #else
     faultingRegion->dirty = true;
-    haveDirtyPages = true;
+    // Enable shadow page flushing; dirty pages will be flushed at the
+    // next sync point, which is the next CUDA call
+    enable_shadow_page_flushing();
 #endif
     // change the permission in the corresponding mem region.
     // FIXME (see above)

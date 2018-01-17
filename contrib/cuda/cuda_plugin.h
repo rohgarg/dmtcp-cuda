@@ -469,6 +469,18 @@ void log_append(void *ptr, size_t size,
                 void *results, size_t resSize);
 #endif
 
+struct ShadowRegion {
+  void *addr;
+  size_t len;
+  bool dirty;
+  int prot;
+};
+
+ShadowRegion* getShadowRegionForAddr(void *addr);
+
+void disable_shadow_page_flushing();
+void enable_shadow_page_flushing();
+
 void disable_cuda_call_logging();
 void enable_cuda_call_logging();
 bool should_log_cuda_calls();
