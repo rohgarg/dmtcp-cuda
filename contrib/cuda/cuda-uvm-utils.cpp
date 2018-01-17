@@ -479,8 +479,7 @@ unregister_all_pages()
 #else
     // Give RW permissions at checkpoint time to allow DMTCP to copy the data
     // to the ckpt img
-    JASSERT(mprotect(it->addr, it->len, PROT_READ | PROT_WRITE) != -1)
-           (JASSERT_ERRNO);
+    reregister_page(it->addr, it->len, PROT_READ | PROT_WRITE);
 #endif
   }
 }
@@ -496,6 +495,7 @@ register_all_pages()
      *
      * FIXME: We need to copy/restore the data on these pages
      */
+    // Restore permissions at resume/restart time
     reregister_page(it->addr, it->len, it->prot);
   }
 }
@@ -594,6 +594,7 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
     reregister_page(faultingPage, page_size, PROT_WRITE);
 #else
     reregister_page(faultingRegion->addr, faultingRegion->len, PROT_WRITE);
+    faultingRegion->prot = PROT_WRITE;
 #endif
   } else {
     // change the permission in the corresponding mem region.
@@ -611,6 +612,7 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
                          faultingRegion->len);
     // XXX: Remove the WRITE permissions
     reregister_page(faultingRegion->addr, faultingRegion->len, PROT_READ);
+    faultingRegion->prot = PROT_READ;
 #endif
   }
   fault_cnt++;
