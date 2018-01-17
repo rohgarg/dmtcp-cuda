@@ -77,7 +77,6 @@ restart()
 #ifdef USERFAULTFD
   reset_uffd();
 #endif
-  register_all_pages();
   // logFd = open(LOGFILE, O_APPEND|O_RDWR);
   // if (logFd == -1)
   // {
@@ -85,10 +84,16 @@ restart()
   //   exit(EXIT_FAILURE);
   // }
   disable_cuda_call_logging();
+  disable_shadow_page_flushing();
 
   // Replay calls from the log
   copy_data_to_device();
+  // After flushing the data to the device, we restore
+  // the perms on the shadow pages to what they were
+  // pre-checkpoint
+  register_all_pages();
   enable_cuda_call_logging();
+  enable_shadow_page_flushing();
 }
 
 static DmtcpBarrier cudaPluginBarriers[] = {

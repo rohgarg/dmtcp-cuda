@@ -17,6 +17,12 @@ struct MallocRegion {
   size_t len;
 };
 
+EXTERNC cudaError_t
+proxy_cudaMallocManagedMemcpy(void *dst, void *src,
+                              size_t size, cudaMemcpyKind kind);
+EXTERNC cudaError_t
+proxy_cudaMallocManaged(void **pointer, size_t size, unsigned int flags);
+
 static dmtcp::vector<MallocRegion>&
 allMallocRegions()
 {
@@ -43,6 +49,30 @@ create_copy_of_data_on_host(CudaCallLog_t *l)
     JASSERT(page != MAP_FAILED)(JASSERT_ERRNO);
     l->host_addr = page;
     cudaMemcpy(page, devPtr, len, cudaMemcpyDeviceToHost);
+  } else if (op == OP_proxy_cudaMallocManaged) {
+    size_t len;
+    void *devPtr;
+    memcpy(&len, l->fncargs + sizeof op, sizeof len);
+    memcpy(&devPtr, l->results, sizeof devPtr);
+    // NOTE: devPtr on the proxy and pointer to the corresponding
+    // shadow page in the master process have the same virtual
+    // address
+    l->host_addr = devPtr;
+    ShadowRegion *r = getShadowRegionForAddr(devPtr);
+    JASSERT(r != NULL)(devPtr);
+    // We don't copy data over dirty shadow pages.
+    if (!r->dirty) {
+      // NOTE: The perms on the shadow pages were set to RW earlier
+      // via a call to unregister_all_pages(). The perms will be restored
+      // later via a call to register_all_pages() in the resume barrier.
+      cudaError_t ret_val =
+           proxy_cudaMallocManagedMemcpy(devPtr, devPtr, len,
+                                         cudaMemcpyDeviceToHost);
+      JASSERT(ret_val == cudaSuccess)(ret_val)
+              .Text("Failed to copy UVM data to host");
+    }
+  } else {
+    JWARNING(false)(op).Text("Unknown op code; no data to copy?");
   }
 }
 
@@ -61,6 +91,31 @@ send_saved_data_to_device(CudaCallLog_t *l)
     JASSERT(ret == cudaSuccess && newDevPtr == devPtr);
     JASSERT(l->host_addr != NULL);
     cudaMemcpy(devPtr, l->host_addr, len, cudaMemcpyHostToDevice);
+  } else if (op == OP_proxy_cudaMallocManaged) {
+    size_t len;
+    unsigned int flags;
+    void *devPtr;
+    memcpy(&len, l->fncargs + sizeof op, sizeof len);
+    memcpy(&flags, l->fncargs + sizeof op + sizeof len, sizeof flags);
+    memcpy(&devPtr, l->results, sizeof devPtr);
+
+    void *newDevPtr = NULL;
+    cudaError_t ret_val = proxy_cudaMallocManaged(&newDevPtr, len, flags);
+    JASSERT(ret_val == cudaSuccess)\
+           (ret_val).Text("Failed to create UVM region");
+    JASSERT(newDevPtr == devPtr && l->host_addr == devPtr);
+    JASSERT(l->host_addr != NULL);
+    ShadowRegion *r = getShadowRegionForAddr(devPtr);
+    JASSERT(r != NULL)(devPtr);
+    // We don't copy data over dirty shadow pages.
+    if (!r->dirty) {
+      ret_val = proxy_cudaMallocManagedMemcpy(devPtr, devPtr, len,
+                                              cudaMemcpyHostToDevice);
+      JASSERT(ret_val == cudaSuccess)(ret_val)
+              .Text("Failed to send UVM dirty pages");
+    }
+  } else {
+    JASSERT(false)(op).Text("Replaying unknown op code");
   }
 }
 
