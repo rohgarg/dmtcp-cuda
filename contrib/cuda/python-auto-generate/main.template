@@ -623,3 +623,48 @@ CUDA_WRAPPER(
 EXTERNC cudaError_t
 proxy_cudaMallocManagedMemcpy(:DEST void *dst, :SRC void *src, :SIZE size_t size, :DIRECTION cudaMemcpyKind kind)
 )
+
+# WRAPPERS for Hypre
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaDeviceGetPCIBusId(:OUT char* pciBusId, int len, int device)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaStreamCreateWithFlags(:OUT cudaStream_t* pStream, unsigned int flags)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaStreamDestroy(cudaStream_t stream)
+)
+
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags)
+)
+
+# CUDA-8.0
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemAdvise(const void* devPtr, size_t count, enum cudaMemoryAdvise advice, int device)
+)
+
+# CUDA-8.0
+CUDA_WRAPPER(
+EXTERNC cudaError_t
+cudaMemPrefetchAsync(const void* devPtr, size_t count, int dstDevice, cudaStream_t stream)
+)
+
+# CUSPARSE
+CUDA_WRAPPER(
+EXTERNC cusparseStatus_t
+cusparseCreate(:OUT cusparseHandle_t *handle)
+)
+
+CUDA_WRAPPER(
+cusparseStatus_t
+cusparseSetStream(cusparseHandle_t handle, cudaStream_t streamId)
+)
