@@ -31,6 +31,9 @@
 # endif // ifdef __cplusplus
 #endif // ifndef EXTERNC
 
+size_t totalRead = 0;
+size_t totalWritten = 0;
+
 EXTERNC ssize_t
 readAll(int fd, void *buf, size_t count)
 {
@@ -52,6 +55,7 @@ readAll(int fd, void *buf, size_t count)
       num_read += rc;
     }
   }
+  totalRead += num_read;
   return num_read;
 }
 
@@ -75,6 +79,7 @@ writeAll(int fd, const void *buf, size_t count)
       num_written += rc;
     }
   } while (num_written < count);
+  totalWritten += num_written;
   return num_written;
 }
 

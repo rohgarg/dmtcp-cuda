@@ -437,6 +437,7 @@ void do_work() {
 
     ret = read(skt_accept, &op, sizeof op);
     if (ret == 0 || ret == -1) {
+      printf("Total: Sent: %zu; Received: %zu\\n", totalRead, totalWritten);
       exit(0);
     } else {
       assert(ret == sizeof op);
