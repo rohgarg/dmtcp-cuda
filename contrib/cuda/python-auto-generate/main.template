@@ -147,6 +147,8 @@ cudaFree(void *pointer) {
     pseudoPinnedMem_remove(pointer);
     return cudaSuccess;
   }
+  // Try to remove shadow region, if any
+  remove_shadow_region(pointer);
 
   return proxy_cudaFree_fnc(pointer);
 };

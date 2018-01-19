@@ -479,6 +479,7 @@ struct ShadowRegion {
 };
 
 ShadowRegion* getShadowRegionForAddr(void *addr);
+void remove_shadow_region(void *addr);
 
 void disable_shadow_page_flushing();
 void enable_shadow_page_flushing();

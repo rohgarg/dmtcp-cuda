@@ -505,6 +505,29 @@ register_all_pages()
   }
 }
 
+void
+remove_shadow_region(void *addr)
+{
+  if (!addr) return;
+
+  dmtcp::vector<ShadowRegion>::iterator it;
+  dmtcp::vector<ShadowRegion>::iterator pos;
+  bool found = false;
+
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    if (addr >= it->addr && addr < it->addr + it->len) {
+      JASSERT(munmap(it->addr, it->len) == 0)
+             (addr)(it->addr)(it->len)(JASSERT_ERRNO);
+      pos = it;
+      found = true;
+      break;
+    }
+  }
+  if (found) {
+    allShadowRegions().erase(pos);
+  }
+}
+
 
 // # define _GNU_SOURCE
 # include <signal.h>
