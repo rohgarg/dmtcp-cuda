@@ -220,10 +220,25 @@ cudaMemcpyGetDirection(const void *destPtr, const void *srcPtr,
                        enum cudaMemcpyKind *direction) {
   cudaPointerAttributes destPtrAttr;
   cudaPointerAttributes srcPtrAttr;
-  JASSERT(cudaPointerGetAttributes(&destPtrAttr, destPtr) == cudaSuccess)
-                                   .Text("Error getting pointer properties");
-  JASSERT(cudaPointerGetAttributes(&srcPtrAttr, srcPtr) == cudaSuccess)
-                                   .Text("Error getting pointer properties");
+
+  // NOTE:
+  // For a host pointer that's only available on the master process (and
+  // not on the proxy process), cudaPointerGetAttributes will return
+  // cudaErrorInvalidValue. Here we assume that this is indeed the case
+  // and mark the pointer as cudaMemoryTypeHost.
+
+  cudaError_t ret = cudaPointerGetAttributes(&destPtrAttr, destPtr);
+  if (ret == cudaErrorInvalidValue) {
+    destPtrAttr.memoryType =  cudaMemoryTypeHost;
+  } else {
+    JASSERT(ret == cudaSuccess);
+  }
+  ret = cudaPointerGetAttributes(&srcPtrAttr, srcPtr);
+  if (ret == cudaErrorInvalidValue) {
+    srcPtrAttr.memoryType =  cudaMemoryTypeHost;
+  } else {
+    JASSERT(ret == cudaSuccess);
+  }
   if (destPtrAttr.memoryType == cudaMemoryTypeHost &&
       srcPtrAttr.memoryType == cudaMemoryTypeHost) {
     *direction = cudaMemcpyHostToHost;
