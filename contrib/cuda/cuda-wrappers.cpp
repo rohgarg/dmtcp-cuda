@@ -149,6 +149,14 @@ copy_data_to_device()
 #endif
 }
 
+EXTERNC CUresult
+cuInit(unsigned int Flags)
+{
+  JWARNING(false).Text("Missing wrapper?");
+  int dummy = 0;
+  while (!dummy);
+}
+
 //================================================================
 #ifdef PYTHON_AUTO_GENERATE
 # include "python-auto-generate/cudawrappers.icpp"
