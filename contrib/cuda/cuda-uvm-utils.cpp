@@ -638,8 +638,10 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
 #else
     reregister_page(faultingRegion->addr, faultingRegion->len,
                     PROT_READ | PROT_WRITE);
+    disable_shadow_page_flushing();
     receiveDataFromProxy(faultingRegion->addr, faultingRegion->addr,
                          faultingRegion->len);
+    enable_shadow_page_flushing();
     // XXX: Remove the WRITE permissions
     reregister_page(faultingRegion->addr, faultingRegion->len, PROT_READ);
     faultingRegion->prot = PROT_READ;
