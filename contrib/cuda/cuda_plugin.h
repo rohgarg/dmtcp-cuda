@@ -6,6 +6,7 @@
 #include <cuda_runtime_api.h>
 #include <driver_types.h>
 #include <cusparse_v2.h>
+#include <cublas.h>
 
 #include "python-auto-generate/cuda_plugin.h"
 

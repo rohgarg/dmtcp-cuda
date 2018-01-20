@@ -60,7 +60,7 @@ vi:
 	vim cuda-plugin.cpp
 
 libcudaproxy.so: cudaproxy.cu python-auto-generate/cudaproxy.icu
-	nvcc -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Xcompiler -fPIC -g -O0 -shared -o $@ ../../src/libjalib.a -ldl $<
+	$(CXX) -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Wno-deprecated-gpu-targets -Xcompiler -fPIC -g -O0 -ccbin ${NVCC_CXX} -shared -o $@ ../../src/libjalib.a -ldl $< -lcublas
 
 # tests ---------------------------------------
 
