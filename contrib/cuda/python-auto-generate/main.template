@@ -688,6 +688,21 @@ cusparseSetStream(cusparseHandle_t handle, cudaStream_t streamId)
 
 CUDA_WRAPPER(
 cusparseStatus_t
+cusparseCreateMatDescr(:OUT cusparseMatDescr_t *descrA)
+)
+
+CUDA_WRAPPER(
+cusparseStatus_t
+cusparseSetMatType(cusparseMatDescr_t descrA, cusparseMatrixType_t type)
+)
+
+CUDA_WRAPPER(
+cusparseStatus_t
+cusparseSetMatIndexBase(cusparseMatDescr_t descrA, cusparseIndexBase_t base)
+)
+
+CUDA_WRAPPER(
+cusparseStatus_t
 cusparseDcsrmv(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int nnz,:IN_DEEPCOPY const double *alpha, const cusparseMatDescr_t descrA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const double *x,:IN_DEEPCOPY const double *beta, double *y)
 )
 
