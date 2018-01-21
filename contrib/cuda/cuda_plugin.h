@@ -495,6 +495,7 @@ void reset_uffd(void);
 void* create_shadow_pages(size_t size, void *remoteAddr = NULL);
 void unregister_all_pages();
 void register_all_pages();
+void protect_all_pages();
 void flushDirtyPages();
 
 // This is now static, scope within one file

@@ -506,6 +506,23 @@ register_all_pages()
 }
 
 void
+protect_all_pages()
+{
+  dmtcp::vector<ShadowRegion>::iterator it;
+  for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
+    /*
+     * NOTE: For some reason, uffd doesn't re-register the page, without
+     *       first munmaping it!  Arguably, this is a kernel bug.
+     *
+     * FIXME: We need to copy/restore the data on these pages
+     */
+    // Restore permissions at resume/restart time
+    it->prot = PROT_NONE;
+    reregister_page(it->addr, it->len, it->prot);
+  }
+}
+
+void
 remove_shadow_region(void *addr)
 {
   if (!addr) return;
