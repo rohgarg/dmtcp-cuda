@@ -667,9 +667,6 @@ def write_cuda_bodies(fnc, args):
       (var, size) = (arg["name"], "sizeof " + arg["name"])
       cudaproxy2.write(("  memcpy(&%s, recv_buf + chars_rcvd, %s);\n" +
                         "  chars_rcvd += %s;\n") % (var, size, size))
-  for arg in args:
-    if arg["tag"][0] in in_style_tags:
-      pass  # Already handled above
     elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
       # Typically, the cuda parameter is of type:  struct cudaSomething *param
       # Strip one '*' from arg["type"] on next line
