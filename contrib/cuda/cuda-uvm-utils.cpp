@@ -573,7 +573,12 @@ segvfault_handler(int signum, siginfo_t *siginfo, void *context)
 
 #ifndef PER_PAGE_FAULTS
   ShadowRegion *faultingRegion = getShadowRegionForAddr(faultingPage);
-  JASSERT(faultingRegion != NULL);
+  if (faultingRegion == NULL) {
+    JWARNING(faultingRegion != NULL)(addr)(page_addr)
+            .Text("Unexpected SEGFAULT! Attach gdb to see the backtrace");
+    static int dummy = 1;
+    while (dummy);
+  }
 #endif
 
   // Find out if this is a write fault.  (Otherwise, it's a read fault.)
