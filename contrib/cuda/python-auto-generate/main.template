@@ -686,6 +686,16 @@ cusparseStatus_t
 cusparseSetStream(cusparseHandle_t handle, cudaStream_t streamId)
 )
 
+CUDA_WRAPPER(
+cusparseStatus_t
+cusparseDcsrmv(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int nnz,:IN_DEEPCOPY const double *alpha, const cusparseMatDescr_t descrA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const double *x,:IN_DEEPCOPY const double *beta, double *y)
+)
+
+CUDA_WRAPPER(
+cusparseStatus_t
+cusparseDestroy(cusparseHandle_t handle)
+)
+
 # CUBLAS
 CUDA_WRAPPER(
 cublasStatus_t
@@ -704,4 +714,14 @@ cublasSetStream_v2(cublasHandle_t handle, cudaStream_t streamId)
 CUDA_WRAPPER(
 cublasStatus_t
 cublasDdot_v2(cublasHandle_t handle, int n, const double *x, int incx, const double *y, int incy, :OUT double *result)
+)
+
+CUDA_WRAPPER(
+cublasStatus_t
+cublasDestroy_v2(cublasHandle_t handle)
+)
+
+CUDA_WRAPPER(
+cublasStatus_t
+cublasDaxpy_v2(cublasHandle_t handle, int n,:IN_DEEPCOPY const double *alpha, const double *x, int incx, double *y, int incy)
 )
