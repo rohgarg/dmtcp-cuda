@@ -30,6 +30,18 @@ cudaMallocManaged(void **pointer, size_t size, unsigned int flags)
     segvfault_initialize();
 #endif
 
+#ifdef CUDA_PASCAL
+  // Note: UVM regions on Pascal can share a page. This can
+  // cause problems for us, since the later code assumes one
+  // UVM region per page. Here, we force every allocation to be
+  // at least a page size to avoid this problem. This
+  // restriction/hack can be fixed later. FIXME
+  int npages = (size % page_size == 0) ?
+               (size / page_size) : (size / page_size + 1);
+  size = npages * page_size;
+  JASSERT(size % page_size == 0)(size);
+#endif
+
   cudaError_t ret_val = proxy_cudaMallocManaged(pointer, size, flags);
   JASSERT(ret_val == cudaSuccess)\
          (ret_val).Text("Failed to create UVM region");
