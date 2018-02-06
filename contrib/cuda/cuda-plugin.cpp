@@ -40,13 +40,20 @@ cuda_event_hook(DmtcpEvent_t event, DmtcpEventData_t *data)
     break;
   }
   case DMTCP_EVENT_EXIT:
+  {
     JTRACE("The plugin is being called before exiting.");
 #ifdef STATS
     JNOTE("Runtime stats")(totalTimeInRecvingUVMData)(totalTimeInSendingUVMData)
          (totalTimeInSearchingShadowPages);
     print_stats();
-#endif
+#endif // ifdef STATS
+#ifdef USE_SHM
+    enum cuda_op op = OP_LAST_FNC;
+    memcpy(shared_mem_ptr, &op, sizeof op);
+    unlock_proxy();
+#endif // ifdef USE_SHM
     break;
+  }
   default:
     break;
   }

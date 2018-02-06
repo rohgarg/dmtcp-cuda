@@ -41,6 +41,21 @@ bool enableCudaCallLogging = true;
 pid_t cpid = 0;
 #endif // ifdef USE_CMA
 
+#ifdef USE_SHM
+int shmid;
+char *shmptr;
+
+int shared_mem_id;
+char *shared_mem_ptr;
+
+pthread_cond_t *cvptr;    // Condition Variable Pointer
+pthread_condattr_t cattr; // Condition Variable Attribute
+pthread_mutex_t    *mptr; // Mutex Pointer
+pthread_mutexattr_t matr; // Mutex Attribute
+
+enum turn *current_turn;
+#endif // ifdef USE_SHM
+
 // initialize the proxy
 void
 proxy_initialize(void)
@@ -86,6 +101,27 @@ proxy_initialize(void)
 #ifdef USE_CMA
   JASSERT(readAll(skt_master, &cpid, sizeof(cpid)) == sizeof(cpid) && cpid > 0);
 #endif // ifdef USE_CMA
+#ifdef USE_SHM
+  JASSERT(readAll(skt_master, &shmid, sizeof(shmid)) == sizeof(shmid) &&
+          shmid > 0);
+  JASSERT(readAll(skt_master, &shared_mem_id, sizeof(shared_mem_id)) ==
+                 sizeof(shared_mem_id) &&
+          shared_mem_id > 0);
+
+  JASSERT((shmptr = (char *)shmat(shmid, (void *)0, 0)) != NULL)
+         (JASSERT_ERRNO);
+  JASSERT((shared_mem_ptr = (char *)shmat(shared_mem_id, (void *)0, 0)) != NULL)
+         (JASSERT_ERRNO);
+
+  cvptr = (pthread_cond_t *)shmptr; // condition variable
+  mptr = (pthread_mutex_t *)(shmptr + sizeof(*cvptr)); // mutex
+  current_turn = (enum turn*)(shmptr + sizeof(*cvptr) + sizeof(*mptr));
+
+  // ensure that the SHM resources are cleaned up when the process exits
+  struct shmid_ds buf;
+  shmctl(shared_mem_id, IPC_RMID, &buf);
+  shmctl(shmid, IPC_RMID, &buf);
+#endif // ifdef USE_SHM
 
   initialized = True;
 }

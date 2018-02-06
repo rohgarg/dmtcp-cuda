@@ -10,7 +10,7 @@ LIBNAME=libdmtcp_${NAME}.so
 LIBOBJS = cuda-plugin.o cuda-wrappers.o cuda-common-utils.o cuda-uvm-utils.o cuda-uvm-wrappers.o log_append_and_read.o
 
 AUTO_GENERATE_FILES = python-auto-generate/cudawrappers.icpp \
-	python-auto-generate/cudaproxy.icpp
+	python-auto-generate/cudaproxy.icu
 
 CC=nvcc
 CXX=nvcc
@@ -40,23 +40,43 @@ CXXFLAGS += -arch sm_30
 
 # CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
 # CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin /usr/bin/g++-5 -Xcompiler -fPIC -c -g -O0 -cudart shared
-CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
-CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CXX} -Xcompiler -fPIC -c -g -O0 -cudart shared
+CFLAGS += -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
+CXXFLAGS += -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CXX} -Xcompiler -fPIC -c -g -O0 -cudart shared
+
+# Set USE_SHM to 1 to enable SHM for master-proxy
+# communication
+USE_SHM?=0
+
+ifeq (${USE_SHM}, 1)
+ SHM_FLAGS=-DUSE_SHM
+else
+ SHM_FLAGS=-DUSE_SHM
+endif
+
+CFLAGS += ${SHM_FLAGS}
+CXXFLAGS += ${SHM_FLAGS}
+
+# Use this for Pascal machines
+CFLAGS += -DCUDA_PASCAL
+CXXFLAGS += -DCUDA_PASCAL
 
 DEMO_PORT=7781
 
-default: ${LIBNAME} libcudaproxy.so
+default: python-auto-generate/cudawrappers.icpp ${LIBNAME} libcudaproxy.so
 
 # cudaproxy.icu cudawrappers.icpp cuda_plugin.h created in subdirectory
 # A symbolic link to there from main directory allows those files to be included
 ${AUTO_GENERATE_FILES}: python-auto-generate/cuda-wrappers.py
-	cd python-auto-generate && make
+	cd python-auto-generate && make USE_SHM=${USE_SHM}
 
 vi:
 	vim cuda-plugin.cpp
 
-libcudaproxy.so: cudaproxy.cu python-auto-generate/cudaproxy.icu
-	$(CXX) -cudart shared -DSTANDALONE -I. -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -Wno-deprecated-gpu-targets -Xcompiler -fPIC -g -O0 -ccbin ${NVCC_CXX} -shared -o $@ ../../src/libjalib.a -ldl $< -lcublas
+libcudaproxy.so: cudaproxy.o
+	$(CXX) -Wno-deprecated-gpu-targets -cudart shared -shared -o $@ $< ${DMTCP_ROOT}/src/libjalib.a -ldl -lcublas
+
+cudaproxy.o: cudaproxy.cu python-auto-generate/cudaproxy.icu
+	$(CXX) -DSTANDALONE ${CXXFLAGS} -Wno-deprecated-gpu-targets -Xcompiler -shared -o $@ $<
 
 # tests ---------------------------------------
 
@@ -136,7 +156,7 @@ check%: test/test% ${LIBNAME} libcudaproxy.so
 
 # We link the library using C++ for compatibility with the main libdmtcp.so
 ${LIBNAME}: ${LIBOBJS}
-	${CXX} -cudart shared -shared -o $@ $^
+	${CXX} -Wno-deprecated-gpu-targets -cudart shared -shared -o $@ $^
 
 cuda-wrappers.o: cuda-wrappers.cpp python-auto-generate/cudawrappers.icpp
 	${CC} ${CFLAGS} -o $@ $<

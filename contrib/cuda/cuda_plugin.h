@@ -9,10 +9,18 @@
 #include <cublas.h>
 #include <sys/time.h>
 
+#ifdef USE_SHM
+# include <sys/ipc.h>
+# include <sys/shm.h>
+#endif // ifdef USE_SHM
+
 #include "dmtcp.h"
 
 // The following declarations, definitions, etc. are common
 // to the DMTCP CUDA plugin and the CUDA proxy.
+
+#define SHM_REGION_1_SIZE 100
+#define SHM_REGION_2_SIZE 4096
 
 #include "python-auto-generate/cuda_plugin.h"
 
@@ -64,6 +72,36 @@ extern std::map<uint64_t, uint64_t> uvmWriteReqMap;
 # define CUDA_CALL_END_TIME(myop)
 
 #endif // ifdef STATS
+
+#ifdef USE_SHM
+// An object of this enum is used for synchronization between the master
+// and the proxy.
+enum turn
+{
+  master,
+  slave,
+};
+
+// We have two SHM regions: (1) where we keep shared mutexes, condition
+// variables, etc. This region is used for synchronizing the two processes
+// (master and the proxy); and (2) where we read/write the actual meta-data
+// (function arguments) and return values. Region (1) is smaller
+// (SHM_REGION_1_SIZE) than Region (2) (SHM_REGION_2_SIZE)
+
+// SHM Region (1): for mutex, cond. var., etc
+extern int shmid;
+extern char *shmptr;
+
+// SHM Region (2): for actual data
+extern int shared_mem_id;
+extern char *shared_mem_ptr;
+
+extern pthread_cond_t *cvptr;    // Condition Variable Pointer
+extern pthread_condattr_t cattr; // Condition Variable Attribute
+extern pthread_mutex_t    *mptr; // Mutex Pointer
+extern pthread_mutexattr_t matr; // Mutex Attribute
+extern turn *current_turn;
+#endif // ifdef USE_SHM
 
 extern void print_stats();
 EXTERNC ssize_t readAll(int fd, void *buf, size_t count);
@@ -166,6 +204,53 @@ void unregister_all_pages();
 void register_all_pages();
 void protect_all_pages();
 void flushDirtyPages();
+
+#ifdef USE_SHM
+static inline void
+unlock_proxy()
+{
+  pthread_mutex_lock(mptr);
+  *current_turn = slave;
+  pthread_cond_signal(cvptr);
+  pthread_mutex_unlock(mptr);
+}
+
+static inline void
+wait_for_masters_turn()
+{
+  pthread_mutex_lock(mptr);
+  while (*current_turn != master) {
+    pthread_cond_wait(cvptr, mptr);
+  }
+  pthread_mutex_unlock(mptr);
+}
+#endif // ifdef USE_SHM
+
+#else // ifndef STANDALONE
+
+// The following declarations, definitions, etc. are only
+// valid only for the proxy
+
+#ifdef USE_SHM
+static inline void
+unlock_master()
+{
+  pthread_mutex_lock(mptr);
+  *current_turn = master;
+  pthread_cond_signal(cvptr);
+  pthread_mutex_unlock(mptr);
+}
+
+static inline void
+wait_for_proxys_turn(enum turn whatPoint = slave)
+{
+  pthread_mutex_lock(mptr);
+  while (*current_turn != whatPoint) {
+    pthread_cond_wait(cvptr, mptr);
+  }
+  pthread_mutex_unlock(mptr);
+}
+#endif // ifdef USE_SHM
 
 #endif // ifndef STANDALONE
 

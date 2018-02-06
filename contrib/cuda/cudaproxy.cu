@@ -21,6 +21,25 @@
 size_t totalRead = 0;
 size_t totalWritten = 0;
 
+static pid_t ppid = 0;
+
+#ifdef USE_SHM
+// for mutex, cond. var., etc
+int shmid;
+char *shmptr;
+
+// for actual data
+int shared_mem_id;
+char *shared_mem_ptr;
+
+pthread_cond_t *cvptr;
+pthread_condattr_t cattr;
+pthread_mutex_t    *mptr;
+pthread_mutexattr_t matr;
+
+enum turn *current_turn;
+#endif // ifdef USE_SHM
+
 #ifdef STATS
 struct CallCost costs[OP_LAST_FNC] = {0};
 uint64_t totalTimeInUvmCopy = 0;
@@ -170,9 +189,44 @@ static int start_proxy(void)
     exit(EXIT_FAILURE);
   }
 
+  ppid = getppid();
+  assert(ppid != -1);
+
+#ifdef USE_SHM
+  if ((shmid = shmget(IPC_PRIVATE, SHM_REGION_1_SIZE,
+                      IPC_EXCL | IPC_CREAT | 0660)) < 0)
+    perror("shmget"), exit(1) ;
+
+  if ((shmptr = (char *)shmat(shmid, (void *)0, 0)) == NULL)
+    perror("shmat"), exit(1);
+
+  if ((shared_mem_id = shmget(IPC_PRIVATE, SHM_REGION_2_SIZE,
+                              IPC_EXCL | IPC_CREAT | 0660)) < 0)
+    perror("shmget"), exit(1) ;
+
+  if ((shared_mem_ptr = (char *)shmat(shared_mem_id, (void *)0, 0)) == NULL)
+    perror("shmat"), exit(1);
+
+  cvptr = (pthread_cond_t *)shmptr;
+  mptr = (pthread_mutex_t *)((char*)cvptr + sizeof(*cvptr));
+  current_turn = (enum turn*)((char*)mptr + sizeof(*mptr));
+
+  pthread_mutexattr_init(&matr);
+  pthread_mutexattr_setpshared(&matr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(mptr, &matr);
+
+  pthread_condattr_init(&cattr);
+  pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+  pthread_cond_init(cvptr, &cattr);
+#endif // ifdef USE_SHM
+
 #ifdef USE_CMA
   assert(writeAll(skt_accept, &pid, sizeof pid) == sizeof pid);
 #endif // ifdef USE_CMA
+#ifdef USE_SHM
+  assert(writeAll(skt_accept, &shmid, sizeof shmid) == sizeof shmid);
+  assert(writeAll(skt_accept, &shared_mem_id, sizeof shared_mem_id) == sizeof shared_mem_id);
+#endif // ifdef USE_SHM
 
   // do_work() has an infinite 'while(1)' loop.
   do_work(); // never returns
