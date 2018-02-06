@@ -97,11 +97,16 @@
 # CUDA_WRAPPER_WITH_LOGGING(...) -- same, but also calls log_append()
 #                                   for log-and-replay.
 #
-# CUDA_VERBATIM_WRAPPER(...) -- inserts code directly into cudawrapper.icc
-#   For technical reasons, comments in the code are not currently preserved.
+# CUDA_VERBATIM_WRAPPER(
+#   ...
+# ) -- inserts code directly into cudawrapper.icc
+#   No space is allowed after "CUDA_VERBATIM_WRAPPER" and the final ')'
+#   must be at the beginning of a line.
 #
-# CUDA_VERBATIM_PROXY(...) -- inserts code directly into cudaproxy.icc
-#   For technical reasons, comments in the code are not currently preserved.
+# CUDA_VERBATIM_PROXY(
+#   ...
+# ) -- inserts code directly into cudaproxy.icc
+#   Similar restrictions apply to  "CUDA_VERBATIM_PROXY" and the final ')'.
 
 ########################################################################
 # These signatures are taken from the github repo, from cuda-wrappers.cpp

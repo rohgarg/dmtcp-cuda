@@ -54,12 +54,20 @@ lexified = []
 while(myinput):
   myinput = myinput.strip()
   comment = get_comment(myinput)
-  if comment:
+  if myinput.startswith("CUDA_VERBATIM_WRAPPER(") or \
+     myinput.startswith("CUDA_VERBATIM_PROXY("):
+    word1 = myinput.split('(', 1)
+    word2 = word1[1].split("\n)", 1)
+    lexified.append(word1[0])
+    lexified.append(word2[0][word2[0].index('\n') + 1:])
+    myinput = word2[1]
+    continue
+  elif comment:
     word = comment
   else:
     word = get_word(myinput)
-  myinput = myinput[len(word):]
   lexified.append(word)
+  myinput = myinput[len(word):]
 
 # ===================================================================
 # PARSE DECLARATION
@@ -68,22 +76,6 @@ while(myinput):
 
 verbatim_wrappers = ""
 verbatim_proxies = ""
-
-def extract_balanced_expression(input):
-  index = 1
-  assert input[index] == '('
-  expr = ""
-  parens = 0
-  while index <= 1 or parens > 0:
-    if input[index] == '(':
-      parens += 1
-    elif input[index] == ')':
-      parens -= 1
-    expr += input[index] + ' '
-    index += 1
-  expr = expr.strip()[1:-1] # Strip expr of first '(' and final ')'
-  expr = expr.replace(" {", "\n{").replace("; ", ";\n") + '\n'
-  return (expr, input[index:])
 
 myinput = lexified
 myinput = [ term for term in myinput if not is_comment(term) ]
@@ -97,7 +89,8 @@ def parse_aux(input, rest):
   while(input):
     while input[0] in ["CUDA_VERBATIM_WRAPPER", "CUDA_VERBATIM_PROXY"]:
       verbatim_type = input[0]
-      (expr, input) = extract_balanced_expression(input)
+      expr = input[1]  # next word is the verbatim function as a string
+      input = input[2:]
       if verbatim_type == "CUDA_VERBATIM_WRAPPER":
         verbatim_wrappers+= "// Verbatim from " + sys.argv[1] + "\n" + expr+"\n"
       elif verbatim_type == "CUDA_VERBATIM_PROXY":
