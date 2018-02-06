@@ -544,6 +544,13 @@ extern uint64_t totalTimeInSearchingShadowPages;
 extern uint64_t totalTimeInRecvingUVMData;
 #endif // ifdef STATS
 
+#ifdef USE_CMA
+// DMTCP CUDA plugin uses this to store the pid of the
+// forked child proxy process. This is then used for
+// doing CMA transfers of UVM data.
+extern pid_t cpid;
+#endif // ifdef USE_CMA
+
 ShadowRegion* getShadowRegionForAddr(void *addr);
 void remove_shadow_region(void *addr);
 

@@ -149,6 +149,9 @@ static int start_proxy(void)
   // set up the server
   int skt_proxy;
   struct sockaddr_un sa_proxy;
+#ifdef USE_CMA
+  pid_t pid = getpid();
+#endif // ifdef USE_CMA
   const char *sktname = getenv("CUDA_PROXY_SOCKET");
   if (!sktname) {
     sktname = SKTNAME;
@@ -200,6 +203,11 @@ static int start_proxy(void)
 #endif
 
 #ifdef PYTHON_AUTO_GENERATE
+
+#ifdef USE_CMA
+  assert(writeAll(skt_accept, &pid, sizeof pid) == sizeof pid);
+#endif // ifdef USE_CMA
+
   // do_work() has an infinite 'while(1)' loop.
   do_work(); // never returns
   return 0;  // To satisfy compiler

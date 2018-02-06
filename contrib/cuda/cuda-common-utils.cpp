@@ -45,8 +45,13 @@ struct sockaddr_un sa_proxy;
 // NOTE: Do not access this directly; use the accessor functions
 bool enableCudaCallLogging = true;
 
+#ifdef USE_CMA
+pid_t cpid = 0;
+#endif // ifdef USE_CMA
+
 // initialize the proxy
-void proxy_initialize(void)
+void
+proxy_initialize(void)
 {
   // char sktname[10] = {0};
   // snprintf(sktname, 10, "%s%d", SKTNAME, rand()%9);
@@ -103,6 +108,9 @@ void proxy_initialize(void)
   int realId = dmtcp_virtual_to_real_shmid(shmID);
   JASSERT(write(skt_master, &realId, sizeof(shmID)) != -1)(JASSERT_ERRNO);
 #endif
+#ifdef USE_CMA
+  JASSERT(readAll(skt_master, &cpid, sizeof(cpid)) == sizeof(cpid) && cpid > 0);
+#endif // ifdef USE_CMA
 
   initialized = True;
 }

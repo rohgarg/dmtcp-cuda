@@ -5,6 +5,9 @@
 #include <cuda_runtime_api.h>
 #include <unistd.h>
 #include <fcntl.h>
+#ifdef USE_CMA
+# include <sys/uio.h>
+#endif // ifdef USE_CMA
 
 #ifdef USERFAULTFD_DEFINED
 #include <linux/userfaultfd.h>
@@ -146,11 +149,27 @@ sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
   uint64_t sec = spec.tv_sec * 1e9 + spec.tv_nsec;
 #endif // ifdef STATS
 
+#ifdef USE_CMA
+  struct iovec local_iov[1] = {0};
+  struct iovec remote_iov[1] = {0};
+  local_iov[0].iov_base = localPtr;
+  local_iov[0].iov_len = size;
+  remote_iov[0].iov_base = remotePtr;
+  remote_iov[0].iov_len = size;
+  // We need this extra step for CMA, since CMA implements the
+  // write-only semantics correctly. The following process_vm_writev
+  // call would fail because it won't be able to read from the local
+  // shadow page region.
+  reregister_page(it->addr, it->len, PROT_READ | PROT_WRITE);
+  JASSERT(process_vm_writev(cpid, local_iov, 1, remote_iov, 1, 0) == size)
+         (JASSERT_ERRNO);
+#else
   cudaError_t ret_val = proxy_cudaMallocManagedMemcpy(remotePtr, localPtr,
                                                       size,
                                                       cudaMemcpyHostToDevice);
   JASSERT(ret_val == cudaSuccess)(ret_val)
           .Text("Failed to send UVM dirty pages");
+#endif // ifdef USE_CMA
 
 #ifdef STATS
   clock_gettime(CLOCK_REALTIME, &spec);
@@ -173,11 +192,22 @@ receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
   uint64_t sec = spec.tv_sec * 1e9 + spec.tv_nsec;
 #endif // ifdef STATS
 
+#ifdef USE_CMA
+  struct iovec local_iov[1] = {0};
+  struct iovec remote_iov[1] = {0};
+  local_iov[0].iov_base = localPtr;
+  local_iov[0].iov_len = size;
+  remote_iov[0].iov_base = remotePtr;
+  remote_iov[0].iov_len = size;
+  JASSERT(process_vm_readv(cpid, local_iov, 1, remote_iov, 1, 0) == size)
+         (JASSERT_ERRNO);
+#else
   cudaError_t ret_val = proxy_cudaMallocManagedMemcpy(remotePtr, localPtr,
                                                       size,
                                                       cudaMemcpyDeviceToHost);
   JASSERT(ret_val == cudaSuccess)(ret_val)
           .Text("Failed to receive UVM data");
+#endif // ifdef USE_CMA
 
 #ifdef STATS
   clock_gettime(CLOCK_REALTIME, &spec);
