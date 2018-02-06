@@ -43,10 +43,6 @@ CXXFLAGS += -arch sm_30
 CFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CC} -Xcompiler -fPIC -c -g -O0
 CXXFLAGS += -I${DMTCP_INCLUDE} -I${JALIB_INCLUDE} -I${DMTCP_ROOT}/src -DDMTCP -ccbin ${NVCC_CXX} -Xcompiler -fPIC -c -g -O0 -cudart shared
 
-# enable this for debugging the plugin
-# CFLAGS += -DCUDA_PLUGIN_DEBUG
-# CXXFLAGS += -DCUDA_PLUGIN_DEBUG
-
 DEMO_PORT=7781
 
 default: ${LIBNAME} libcudaproxy.so
