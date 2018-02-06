@@ -34,6 +34,13 @@
 size_t totalRead = 0;
 size_t totalWritten = 0;
 
+#ifdef STATS
+struct CallCost costs[OP_LAST_FNC] = {0};
+uint64_t totalTimeInUvmCopy = 0;
+std::map<uint64_t, uint64_t> uvmReadReqMap;
+std::map<uint64_t, uint64_t> uvmWriteReqMap;
+#endif // ifdef STATS
+
 EXTERNC ssize_t
 readAll(int fd, void *buf, size_t count)
 {
@@ -83,14 +90,33 @@ writeAll(int fd, const void *buf, size_t count)
   return num_written;
 }
 
-#ifdef PYTHON_AUTO_GENERATE
-# include "python-auto-generate/cudaproxy.icu"
-#endif
 
-#ifdef USE_SHM
-int shmID;
-void *shmaddr;
+void
+print_stats()
+{
+  printf("Total: Sent: %zu; Received: %zu\n", totalRead, totalWritten);
+#ifdef STATS
+  printf("Total: Total Time In Uvm Copy: %zu\n", totalTimeInUvmCopy);
+  printf("Total: Write request map:\n");
+  for(std::map<uint64_t, uint64_t>::const_iterator it = uvmWriteReqMap.begin();
+      it != uvmWriteReqMap.end(); ++it) {
+    printf("%d, %d\n", it->first, it->second);
+  }
+  printf("Total: Read request map:\n");
+  for(std::map<uint64_t, uint64_t>::const_iterator it = uvmReadReqMap.begin();
+      it != uvmReadReqMap.end(); ++it) {
+    printf("%d, %d\n", it->first, it->second);
+  }
+  printf("Total: CUDA call cost:\n");
+  for (int i = 0; i < OP_LAST_FNC; i++) {
+    if (costs[i].count > 0) {
+       printf("%d, %d, %llu, %llu\n", i, costs[i].count, costs[i].totalTime, costs[i].cudaCallCost);
+    }
+  }
 #endif
+}
+
+# include "python-auto-generate/cudaproxy.icu"
 
 static trampoline_info_t main_trampoline_info;
 

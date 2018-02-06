@@ -430,16 +430,18 @@ void do_work() {
 
     ret = read(skt_accept, &op, sizeof op);
     if (ret == 0 || ret == -1) {
-      printf("Total: Sent: %zu; Received: %zu\\n", totalRead, totalWritten);
+      print_stats();
       exit(0);
     } else {
       assert(ret == sizeof op);
     }
+    FNC_START_TIME(op);
     switch (op) {
 """)
 cudaproxy.write(cudaproxy_head)
 cudaproxy_tail = (
 """    }
+    FNC_END_TIME(op);
   }
 }
 """)
@@ -525,7 +527,8 @@ def write_cuda_bodies(fnc, args):
   cudaproxy_prolog = (
 """  char send_buf[1000];
   int chars_sent = 0;
-""")
+  %s ret_val;
+""" % fnc["type"].replace("EXTERNC ", ""))
   def some_incoming_args(args):
     return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
   if some_incoming_args(args):
@@ -699,8 +702,10 @@ def write_cuda_bodies(fnc, args):
   cudaproxy2.write(
 """
   // Make the function call
-""")
-  cudaproxy2.write("  " + fnc["type"] + " ret_val = " + fnc_call + ";\n")
+  CUDA_CALL_START_TIME(%s);
+""" % ("OP_" + fnc["name"]))
+  cudaproxy2.write("  ret_val = " + fnc_call + ";\n")
+  cudaproxy2.write("  CUDA_CALL_END_TIME(%s);\n" % ("OP_" + fnc["name"]))
 
   cudaproxy2.write("""
   // Write back the arguments to the application

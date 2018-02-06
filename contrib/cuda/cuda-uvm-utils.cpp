@@ -29,6 +29,12 @@ int SHIFT = -1;
 
 bool haveDirtyPages = false;
 
+#ifdef STATS
+uint64_t totalTimeInSearchingShadowPages = 0;
+uint64_t totalTimeInSendingUVMData = 0;
+uint64_t totalTimeInRecvingUVMData = 0;
+#endif // ifdef STATS
+
 EXTERNC cudaError_t
 proxy_cudaMallocManagedMemcpy(void *dst, void *src,
                               size_t size, cudaMemcpyKind kind);
@@ -134,11 +140,23 @@ monitor_pages(void *addr, size_t size,
 static bool
 sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 {
+#ifdef STATS
+  struct timespec spec;
+  clock_gettime(CLOCK_REALTIME, &spec);
+  uint64_t sec = spec.tv_sec * 1e9 + spec.tv_nsec;
+#endif // ifdef STATS
+
   cudaError_t ret_val = proxy_cudaMallocManagedMemcpy(remotePtr, localPtr,
                                                       size,
                                                       cudaMemcpyHostToDevice);
   JASSERT(ret_val == cudaSuccess)(ret_val)
           .Text("Failed to send UVM dirty pages");
+
+#ifdef STATS
+  clock_gettime(CLOCK_REALTIME, &spec);
+  sec = spec.tv_sec * 1e9 + spec.tv_nsec - sec;
+  totalTimeInSendingUVMData += sec;
+#endif // ifdef STATS
 }
 
 /*
@@ -149,11 +167,23 @@ sendDataToProxy(void *remotePtr, void *localPtr, size_t size)
 static bool
 receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 {
+#ifdef STATS
+  struct timespec spec;
+  clock_gettime(CLOCK_REALTIME, &spec);
+  uint64_t sec = spec.tv_sec * 1e9 + spec.tv_nsec;
+#endif // ifdef STATS
+
   cudaError_t ret_val = proxy_cudaMallocManagedMemcpy(remotePtr, localPtr,
                                                       size,
                                                       cudaMemcpyDeviceToHost);
   JASSERT(ret_val == cudaSuccess)(ret_val)
           .Text("Failed to receive UVM data");
+
+#ifdef STATS
+  clock_gettime(CLOCK_REALTIME, &spec);
+  sec = spec.tv_sec * 1e9 + spec.tv_nsec - sec;
+  totalTimeInRecvingUVMData += sec;
+#endif // ifdef STATS
 }
 
 /*
@@ -179,6 +209,12 @@ markDirtyRegion(void *page)
 ShadowRegion*
 getShadowRegionForAddr(void *addr)
 {
+#ifdef STATS
+  struct timespec spec;
+  clock_gettime(CLOCK_REALTIME, &spec);
+  uint64_t sec = spec.tv_sec * 1e9 + spec.tv_nsec;
+#endif // ifdef STATS
+
   ShadowRegion *r = NULL;
 
   dmtcp::list<ShadowRegion>::iterator it;
@@ -188,6 +224,13 @@ getShadowRegionForAddr(void *addr)
       break;
     }
   }
+
+#ifdef STATS
+  clock_gettime(CLOCK_REALTIME, &spec);
+  sec = spec.tv_sec * 1e9 + spec.tv_nsec - sec;
+  totalTimeInSearchingShadowPages += sec;
+#endif // ifdef STATS
+
   return r;
 }
 

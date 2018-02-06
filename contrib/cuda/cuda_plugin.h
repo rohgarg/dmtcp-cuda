@@ -7,10 +7,69 @@
 #include <driver_types.h>
 #include <cusparse_v2.h>
 #include <cublas.h>
+#include <sys/time.h>
+
+// The following declarations, definitions, etc. are common
+// to the DMTCP CUDA plugin and the CUDA proxy.
 
 #include "python-auto-generate/cuda_plugin.h"
 
+#ifdef STATS
+
+struct CallCost
+{
+  uint64_t count;
+  uint64_t totalTime;
+  uint64_t cudaCallCost;
+};
+
+# define FNC_START_TIME(op) \
+    costs[op].count++; \
+    struct timeval start = {0}; \
+    struct timeval end = {0}; \
+    gettimeofday(&start, NULL);
+
+# define FNC_END_TIME(op) \
+    gettimeofday(&end, NULL); \
+    struct timeval res; \
+    timersub(&end, &start, &res); \
+    costs[op].totalTime += res.tv_sec * 1e6 + res.tv_usec; \
+
+
+# define CUDA_CALL_START_TIME(myop) \
+  { \
+    struct timespec spec; \
+    clock_gettime(CLOCK_REALTIME, &spec); \
+    uint64_t sec = spec.tv_sec * 1e9 + spec.tv_nsec;
+
+# define CUDA_CALL_END_TIME(myop) \
+    clock_gettime(CLOCK_REALTIME, &spec); \
+    sec = spec.tv_sec * 1e9 + spec.tv_nsec - sec; \
+    costs[(myop)].cudaCallCost += sec; \
+  }
+
+extern struct CallCost costs[OP_LAST_FNC];
+
+extern uint64_t totalTimeInUvmCopy;
+extern std::map<uint64_t, uint64_t> uvmReadReqMap;
+extern std::map<uint64_t, uint64_t> uvmWriteReqMap;
+
+#else
+
+# define FNC_START_TIME(op)
+# define FNC_END_TIME(op)
+# define CUDA_CALL_START_TIME(myop)
+# define CUDA_CALL_END_TIME(myop)
+
+#endif // ifdef STATS
+
+extern void print_stats();
+
 #ifndef STANDALONE
+
+// The following declarations, definitions, etc. are only
+// valid for the DMTCP CUDA plugin
+
 #include <stdint.h>
 
 #include "jassert.h"
@@ -478,6 +537,12 @@ struct ShadowRegion {
   bool dirty;
   int prot;
 };
+
+#ifdef STATS
+extern uint64_t totalTimeInSendingUVMData;
+extern uint64_t totalTimeInSearchingShadowPages;
+extern uint64_t totalTimeInRecvingUVMData;
+#endif // ifdef STATS
 
 ShadowRegion* getShadowRegionForAddr(void *addr);
 void remove_shadow_region(void *addr);
