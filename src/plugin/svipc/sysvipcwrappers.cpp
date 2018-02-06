@@ -88,6 +88,10 @@ void *shmat(int shmid, const void *shmaddr, int shmflg)
 {
   DMTCP_PLUGIN_DISABLE_CKPT();
   int realShmid = VIRTUAL_TO_REAL_SHM_ID(shmid);
+  if (realShmid == -1) {
+    SysVShm::instance().updateMapping(shmid, shmid);
+    realShmid = shmid;
+  }
   JASSERT(realShmid != -1).Text("Not Implemented");
   void *ret = _real_shmat(realShmid, shmaddr, shmflg);
 #ifdef __arm__
