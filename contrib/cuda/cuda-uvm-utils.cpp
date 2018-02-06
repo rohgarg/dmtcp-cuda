@@ -48,13 +48,13 @@ shadowPageMap()
   return *instance;
 }
 
-static dmtcp::vector<ShadowRegion>&
+static dmtcp::list<ShadowRegion>&
 allShadowRegions()
 {
-  static dmtcp::vector<ShadowRegion> *instance = NULL;
+  static dmtcp::list<ShadowRegion> *instance = NULL;
   if (instance == NULL) {
     void *buffer = JALLOC_MALLOC(1024 * 1024);
-    instance = new (buffer)dmtcp::vector<ShadowRegion>();
+    instance = new (buffer)dmtcp::list<ShadowRegion>();
   }
   return *instance;
 }
@@ -164,7 +164,7 @@ receiveDataFromProxy(void *remotePtr, void *localPtr, size_t size)
 static void
 markDirtyRegion(void *page)
 {
-  dmtcp::vector<ShadowRegion>::iterator it;
+  dmtcp::list<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
     if (it->addr == page) {
       it->dirty = true;
@@ -179,13 +179,16 @@ markDirtyRegion(void *page)
 ShadowRegion*
 getShadowRegionForAddr(void *addr)
 {
-  dmtcp::vector<ShadowRegion>::iterator it;
+  ShadowRegion *r = NULL;
+
+  dmtcp::list<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
     if (addr >= it->addr && addr < it->addr + it->len) {
-      return &(*it);
+      r = &(*it);
+      break;
     }
   }
-  return NULL;
+  return r;
 }
 
 void
@@ -212,7 +215,7 @@ flushDirtyPages()
 
   JTRACE("Flushing all dirty pages");
   inTheMiddleOfFlushing = true;
-  dmtcp::vector<ShadowRegion>::iterator it;
+  dmtcp::list<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
     if (it->dirty) {
       JTRACE("Send data to proxy")((void*)it->addr)(it->len);
@@ -473,7 +476,7 @@ unregister_all_pages()
   struct uffdio_range uffdio_range;
 #endif
 
-  dmtcp::vector<ShadowRegion>::iterator it;
+  dmtcp::list<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
 #ifdef USERFAULTFD
     uffdio_range.start = (uintptr_t)it->addr;
@@ -492,7 +495,7 @@ unregister_all_pages()
 void
 register_all_pages()
 {
-  dmtcp::vector<ShadowRegion>::iterator it;
+  dmtcp::list<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
     /*
      * NOTE: For some reason, uffd doesn't re-register the page, without
@@ -508,17 +511,19 @@ register_all_pages()
 void
 protect_all_pages()
 {
-  dmtcp::vector<ShadowRegion>::iterator it;
+  dmtcp::list<ShadowRegion>::iterator it;
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
-    /*
-     * NOTE: For some reason, uffd doesn't re-register the page, without
-     *       first munmaping it!  Arguably, this is a kernel bug.
-     *
-     * FIXME: We need to copy/restore the data on these pages
-     */
-    // Restore permissions at resume/restart time
-    it->prot = PROT_NONE;
-    reregister_page(it->addr, it->len, it->prot);
+    if (it->prot != PROT_NONE) {
+      /*
+       * NOTE: For some reason, uffd doesn't re-register the page, without
+       *       first munmaping it!  Arguably, this is a kernel bug.
+       *
+       * FIXME: We need to copy/restore the data on these pages
+       */
+      // Restore permissions at resume/restart time
+      it->prot = PROT_NONE;
+      reregister_page(it->addr, it->len, it->prot);
+    }
   }
 }
 
@@ -527,8 +532,8 @@ remove_shadow_region(void *addr)
 {
   if (!addr) return;
 
-  dmtcp::vector<ShadowRegion>::iterator it;
-  dmtcp::vector<ShadowRegion>::iterator pos;
+  dmtcp::list<ShadowRegion>::iterator it;
+  dmtcp::list<ShadowRegion>::iterator pos;
   bool found = false;
 
   for (it = allShadowRegions().begin(); it != allShadowRegions().end(); it++) {
