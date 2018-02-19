@@ -515,6 +515,14 @@ def emit_wrapper_recv_reply_epilog(cudawrappers, application_after):
   cudawrappers.write(application_after)
 # END: emit_wrapper_recv_reply_epilog
 
+def emit_wrapper_return(cudawrappers):
+  cudawrappers.write("""
+  return ret_val;
+}
+
+""")
+# END: emit_wrapper_return(cudawrappers)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -726,11 +734,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_recv_reply_epilog(cudawrappers, application_after)
 
-  cudawrappers.write("""
-  return ret_val;
-}
-
-""")
+  emit_wrapper_return(cudawrappers)
 
   cudaproxy.write("    case OP_" + fnc["name"] + ":\n")
   cudaproxy.write("      FNC_" + fnc["name"] + "();\n      break;\n")
