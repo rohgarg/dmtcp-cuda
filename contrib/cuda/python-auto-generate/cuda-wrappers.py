@@ -142,6 +142,9 @@ ast_wrappers = parse(myinput)
 # INPUT:  ast_wrappers (ast := Abstract Syntax Tree)
 # OUTPUT: ast_annotated_wrappers
 
+# FIXME:  isLogging should never be an attribute of an
+#   abstract syntax tree.  This is a choice of what code to emit.
+#   This option must be removed, and options for emitting code added.  - Gene
 def generate_annotated_wrapper(isLogging, ast):  # abstract syntax tree
   fnc = { "type" : ' '.join(ast[0][:-1]), "name" : ast[0][-1],
           "isLogging" : isLogging}
@@ -193,9 +196,11 @@ while ast_wrappers:
 # print ast_annotated_wrappers
 
 # ===================================================================
-# EMIT GENERATED CODE
-# INPUT:  ast_annotated_wrappers
-# OUTPUT FILES: *-cudawrappers.icpp *-cudawrappers.icu *-cudawrappers.ih
+# AUXILIARY UTILTIES FOR cudaMemcpyKind (key: "DIRECTION")
+# INPUT:  annotated AST, and isLogging argument
+# OUTPUT FILES: cudaMemcpyDir
+# FIXME:  RENAME:
+#   application_before->cudaMemcpy_prolog, application_after->cudaMemcpy_epilog
 
 # ====
 # Utilities for CudaMemcpy, cudaMallocHost, etc.
@@ -360,8 +365,10 @@ def MEMCPY(dest, source, size=None, buf_offset=None):
 #include <cuda_profiler_api.h>
   return result
 
-# ====
-# Emit code into files
+# ===================================================================
+# EMIT GENERATED CODE
+# INPUT:  ast_annotated_wrappers, cudaMemcpyDir
+# OUTPUT FILES: *-cudawrappers.icpp *-cudawrappers.icu *-cudawrappers.ih
 
 if sys.argv[1] == "main.template":
   basefilename = ""
@@ -528,12 +535,12 @@ def write_cuda_bodies(fnc, args):
 
   %s
 
-  %s ret_val;
   %s
+  %s ret_val;
   int chars_sent = 0;
   int chars_rcvd = 0;
 
-""" % (flushDirtyPages_prolog, fnc["type"].replace("EXTERNC ", ""),
+""" % (flushDirtyPages_prolog,
   """char *send_buf = shared_mem_ptr;
   char *recv_buf = shared_mem_ptr;
   // Enable this for safety; it may reduce the performance though
@@ -541,7 +548,8 @@ def write_cuda_bodies(fnc, args):
   """ if use_shm else
   """char send_buf[1000];
   char recv_buf[1000];
-  """
+  """,
+       fnc["type"].replace("EXTERNC ", "")
   ))
 
   if [myarg for myarg in args if myarg["tag"][0] == "DIRECTION"]:
@@ -573,6 +581,7 @@ def write_cuda_bodies(fnc, args):
   cudaproxy_prolog = (
 """  %s
   int chars_sent = 0;
+  int chars_rcvd = 0;
   %s ret_val;
 """ % ("char *send_buf = shared_mem_ptr;" if use_shm else "char send_buf[1000];", fnc["type"].replace("EXTERNC ", "")))
   def some_incoming_args(args):
@@ -581,12 +590,10 @@ def write_cuda_bodies(fnc, args):
     if use_shm:
       cudaproxy_prolog += (
 """  char *recv_buf = shared_mem_ptr;
-  int chars_rcvd = 0;
 """)
     else:
       cudaproxy_prolog += (
 """  char recv_buf[1000];
-  int chars_rcvd = 0;
 """)
 
   #====
