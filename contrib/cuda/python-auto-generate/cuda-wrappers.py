@@ -377,6 +377,9 @@ def MEMCPY(dest, source, size=None, buf_offset=None):
 in_style_tags = ["IN", "SIZE", "DEST", "SRC",
                  "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]
 
+def emit_wrapper_signature(cudawrappers, fnc, fnc_signature):
+  cudawrappers.write(fnc["type"] + "\n" + fnc_signature + "\n")
+
 def emit_wrapper_prolog(cudawrappers, fnc, args):
   flushDirtyPages_prolog = (
   """// TODO: Ideally, we should flush only when the function uses the
@@ -655,7 +658,8 @@ def write_cuda_bodies(fnc, args):
   cuda_include.write("  OP_" + fnc["name"] + ",\n")
   cuda_include2.write("void FNC_" + fnc["name"] + "(void);\n")
 
-  cudawrappers.write(fnc["type"] + "\n" + fnc_signature + "\n")
+  emit_wrapper_signature(cudawrappers, fnc, fnc_signature)
+
   if fnc["type"].startswith("EXTERNC "):
     # Remove "EXTERNC for all uses after this (inside a function)
     fnc["type"] = fnc["type"][len("EXTERNC "):]
