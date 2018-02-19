@@ -397,13 +397,6 @@ def emit_wrapper_prolog(cudawrappers, fnc, args):
   char recv_buf[1000];"""
   ))
 
-  cudawrappers_prolog += (
-"""  %s ret_val;
-  int chars_sent = 0;
-  int chars_rcvd = 0;
-
-""" % (fnc["type"].replace("EXTERNC ", "")))
-
   if [myarg for myarg in args if myarg["tag"][0] == "DIRECTION"]:
     for myarg in args:
       if myarg["tag"][0] == "DEST":
@@ -427,11 +420,15 @@ def emit_wrapper_prolog(cudawrappers, fnc, args):
 def emit_wrapper_pack_args(cudawrappers, fnc, args):
   global in_style_tags
   cudawrappers.write(
-"""  // Write the IN arguments (and INOUT and IN_DEEPCOPY) to the proxy
+"""  %s ret_val;
+  int chars_sent = 0;
+  int chars_rcvd = 0;
+
+  // Write the IN arguments (and INOUT and IN_DEEPCOPY) to the proxy
   enum cuda_op op = OP_%s;
   memcpy(send_buf + chars_sent, &op, sizeof op);
   chars_sent += sizeof(enum cuda_op);
-""" % fnc["name"])
+""" % (fnc["type"].replace("EXTERNC ", ""), fnc["name"]))
   for arg in args:
     if arg["tag"][0] in in_style_tags:
       (var, size) = (arg["name"], "sizeof " + arg["name"])
