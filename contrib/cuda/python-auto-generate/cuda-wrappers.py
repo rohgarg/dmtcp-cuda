@@ -368,8 +368,8 @@ def MEMCPY(dest, source, size=None, buf_offset=None):
 # ===================================================================
 # CREATE AUXILIARY FUNCTIONS
 # INPUT:  annotated AST, and isLogging argument
-# OUTPUT FILES: emit_wrapper_pack_args, emit_wrapper_send_prolog,
-#               emit_wrapper_send,
+# OUTPUT FILES: emit_wrapper_prolog, emit_wrapper_pack_args,
+#               emit_wrapper_send_prolog, emit_wrapper_send,
 #               emit_wrapper_recv_prolog, emit_wrapper_recv,
 #               emit_wrapper_recv_reply
 
@@ -448,6 +448,19 @@ def emit_wrapper_pack_args(cudawrappers, fnc, args):
       cudawrappers.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
                           "  chars_sent += %s;\n") % (var, size, size))
 # END: emit_wrapper_pack_args(cudawrappers, fnc, args)
+
+def emit_wrapper_send(cudawrappers, application_before):
+  cudawrappers.write("%s" % ("  unlock_proxy();" if use_shm else
+"""
+  // Send op code and args to proxy
+  JASSERT(writeAll(skt_master, send_buf, chars_sent) == chars_sent)
+         (JASSERT_ERRNO);
+"""))
+  # This occurs before we send to the proxy process because
+  #   application_before does not use send_buf.  It does its own send,
+  #   since this is typically a pointer to a buffer in the application code.
+  cudawrappers.write(application_before)
+# END: emit_wrapper_send(cudawrappers, application_before)
 
 # ===================================================================
 # EMIT GENERATED CODE
@@ -651,17 +664,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_pack_args(cudawrappers, fnc, args)
 
-
-  cudawrappers.write("%s" % ("  unlock_proxy();" if use_shm else
-"""
-  // Send op code and args to proxy
-  JASSERT(writeAll(skt_master, send_buf, chars_sent) == chars_sent)
-         (JASSERT_ERRNO);
-"""))
-  # This occurs before we send to the proxy process because
-  #   application_before does not use send_buf.  It does its own send,
-  #   since this is typically a pointer to a buffer in the application code.
-  cudawrappers.write(application_before)
+  emit_wrapper_send(cudawrappers, application_before)
 
   sizeof_args = [" + sizeof *" + arg["name"] for arg in args
                                       if arg["tag"][0] in ["OUT", "INOUT"]]
