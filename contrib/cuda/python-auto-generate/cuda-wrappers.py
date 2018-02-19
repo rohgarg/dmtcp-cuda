@@ -291,7 +291,6 @@ def cudaMemcpyExtraCode(args, isLogging):
 """ % args_dict["SRC"])
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
-    direction_declared = True
     proxy_before += (
 """  int _size = -1;
   %s
@@ -313,17 +312,9 @@ def cudaMemcpyExtraCode(args, isLogging):
        args_dict["SRC"], size_proxy_send, args_dict["DEST"]))
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
-    if direction_declared:
-      proxy_after += (
-"""  _direction = %s;
-""" % args_dict["DIRECTION"])
-    else:
-      proxy_after += (
-"""  _direction = %s;
-""" % args_dict["DIRECTION"])
-
     proxy_after += (
-"""  if (_direction == cudaMemcpyDeviceToHost ||
+"""  _direction = %s;
+  if (_direction == cudaMemcpyDeviceToHost ||
       _direction == cudaMemcpyHostToHost) {
     // Send  dest buffer to application process
     // NOTE:  This assumes no pinnned memory.
@@ -333,7 +324,7 @@ def cudaMemcpyExtraCode(args, isLogging):
   else if (_direction == cudaMemcpyHostToDevice) {
     free(%s);
   }
-""" % (args_dict["DEST"], args_dict["DEST"],
+""" % (args_dict["DIRECTION"], args_dict["DEST"], args_dict["DEST"],
        args_dict["SRC"]))
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
@@ -676,8 +667,8 @@ def write_cuda_bodies(fnc, args):
                ', '.join([arg["name"] for arg in args]) +
                ')'
              )
-  direction_declared = False;
 
+  # FIXME:  This code appears to be orphaned.  Should be deleted.
   cudawrappers_epilog = (
 """
   log_append(strce_to_send);
