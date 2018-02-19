@@ -508,6 +508,13 @@ def emit_wrapper_recv_reply(cudawrappers, fnc, args):
 """)
 # END: emit_wrapper_recv_reply(cudawrappers, fnc, args)
 
+def emit_wrapper_recv_reply_epilog(cudawrappers, application_after):
+  # This occurs after we send to the proxy process because
+  #   application_after does not use recv_buf.  It does its own recv, since
+  #   the sender typically sent a pointer to a buffer in the application code.
+  cudawrappers.write(application_after)
+# END: emit_wrapper_recv_reply_epilog
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -717,10 +724,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_recv_reply(cudawrappers, fnc, args)
 
-  # This occurs after we send to the proxy process because
-  #   application_after does not use recv_buf.  It does its own recv, since
-  #   the sender typically sent a pointer to a buffer in the application code.
-  cudawrappers.write(application_after)
+  emit_wrapper_recv_reply_epilog(cudawrappers, application_after)
 
   cudawrappers.write("""
   return ret_val;
