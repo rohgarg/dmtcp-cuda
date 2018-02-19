@@ -465,6 +465,24 @@ def emit_wrapper_send(cudawrappers, application_before):
   cudawrappers.write(application_before)
 # END: emit_wrapper_send(cudawrappers, application_before)
 
+def emit_wrapper_recv_prolog(cudawrappers, fnc, args):
+  sizeof_args = [" + sizeof *" + arg["name"] for arg in args
+                                      if arg["tag"][0] in ["OUT", "INOUT"]]
+  sizeof_args = ''.join(sizeof_args)
+  if sizeof_args.startswith(" + "):
+    sizeof_args = sizeof_args[len(" + "):]
+  cudawrappers.write(
+"""
+  // Receive the OUT arguments after the proxy made the function call
+  // Compute total chars_rcvd to be read in the next msg
+""")
+  if len(sizeof_args) > 0:
+    cudawrappers.write("  chars_rcvd = %s + sizeof ret_val;\n" % sizeof_args)
+  else:
+    cudawrappers.write("  // (No primitive args to receive, except ret_val.)\n")
+    cudawrappers.write("  chars_rcvd = sizeof ret_val;\n")
+# END: emit_wrapper_recv_prolog(cudawrappers, fnc, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -670,21 +688,8 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_send(cudawrappers, application_before)
 
-  sizeof_args = [" + sizeof *" + arg["name"] for arg in args
-                                      if arg["tag"][0] in ["OUT", "INOUT"]]
-  sizeof_args = ''.join(sizeof_args)
-  if sizeof_args.startswith(" + "):
-    sizeof_args = sizeof_args[len(" + "):]
-  cudawrappers.write(
-"""
-  // Receive the OUT arguments after the proxy made the function call
-  // Compute total chars_rcvd to be read in the next msg
-""")
-  if len(sizeof_args) > 0:
-    cudawrappers.write("  chars_rcvd = %s + sizeof ret_val;\n" % sizeof_args)
-  else:
-    cudawrappers.write("  // (No primitive args to receive, except ret_val.)\n")
-    cudawrappers.write("  chars_rcvd = sizeof ret_val;\n")
+  emit_wrapper_recv_prolog(cudawrappers, fnc, args)
+
   # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
   logging_line = "\n  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);\n" if fnc["isLogging"] else ""
   cudawrappers.write(
