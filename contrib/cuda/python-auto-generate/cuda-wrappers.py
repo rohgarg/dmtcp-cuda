@@ -366,6 +366,67 @@ def MEMCPY(dest, source, size=None, buf_offset=None):
   return result
 
 # ===================================================================
+# CREATE AUXILIARY FUNCTIONS
+# INPUT:  annotated AST, and isLogging argument
+# OUTPUT FILES: emit_wrapper_pack_args, emit_wrapper_send_prolog,
+#               emit_wrapper_send,
+#               emit_wrapper_recv_prolog, emit_wrapper_recv,
+#               emit_wrapper_recv_reply
+
+def emit_wrapper_prolog(cudawrappers, fnc, args):
+  flushDirtyPages_prolog = (
+  """// TODO: Ideally, we should flush only when the function uses the
+  // data from the managed regions
+  if (haveDirtyPages)
+    flushDirtyPages();""")
+
+  cudawrappers_prolog = (
+"""{
+  if (!initialized)
+    proxy_initialize();
+
+  %s
+
+  %s
+
+""" % (flushDirtyPages_prolog,
+  """char *send_buf = shared_mem_ptr;
+  char *recv_buf = shared_mem_ptr;
+  // Enable this for safety; it may reduce the performance though
+  // memset(send_buf, 0, SHM_SIZE);
+  """ if use_shm else
+  """char send_buf[1000];
+  char recv_buf[1000];"""
+  ))
+
+  cudawrappers_prolog += (
+"""  %s ret_val;
+  int chars_sent = 0;
+  int chars_rcvd = 0;
+
+""" % (fnc["type"].replace("EXTERNC ", "")))
+
+  if [myarg for myarg in args if myarg["tag"][0] == "DIRECTION"]:
+    for myarg in args:
+      if myarg["tag"][0] == "DEST":
+        dest_var = myarg["name"]
+      elif myarg["tag"][0] == "SRC":
+        src_var = myarg["name"]
+      elif myarg["tag"][0] == "DIRECTION":
+        direction_var = myarg["name"]
+    cudawrappers_prolog += (
+"""  enum cudaMemcpyKind _direction = kind;
+  if (%s == cudaMemcpyDefault) {
+    cudaMemcpyGetDirection(%s, %s, &_direction);
+    %s = _direction;
+  }
+
+""" % (direction_var, dest_var, src_var, direction_var))
+
+  cudawrappers.write(cudawrappers_prolog)
+# END: emit_wrapper_prolog(cudawrappers, fnc, args)
+
+# ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
 # OUTPUT FILES: *-cudawrappers.icpp *-cudawrappers.icu *-cudawrappers.ih
@@ -522,52 +583,6 @@ def write_cuda_bodies(fnc, args):
   in_style_tags = ["IN", "SIZE", "DEST", "SRC",
                    "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]
   direction_declared = False;
-  flushDirtyPages_prolog = (
-  """// TODO: Ideally, we should flush only when the function uses the
-  // data from the managed regions
-  if (haveDirtyPages)
-    flushDirtyPages();""")
-
-  cudawrappers_prolog = (
-"""{
-  if (!initialized)
-    proxy_initialize();
-
-  %s
-
-  %s
-  %s ret_val;
-  int chars_sent = 0;
-  int chars_rcvd = 0;
-
-""" % (flushDirtyPages_prolog,
-  """char *send_buf = shared_mem_ptr;
-  char *recv_buf = shared_mem_ptr;
-  // Enable this for safety; it may reduce the performance though
-  // memset(send_buf, 0, SHM_SIZE);
-  """ if use_shm else
-  """char send_buf[1000];
-  char recv_buf[1000];
-  """,
-       fnc["type"].replace("EXTERNC ", "")
-  ))
-
-  if [myarg for myarg in args if myarg["tag"][0] == "DIRECTION"]:
-    for myarg in args:
-      if myarg["tag"][0] == "DEST":
-        dest_var = myarg["name"]
-      elif myarg["tag"][0] == "SRC":
-        src_var = myarg["name"]
-      elif myarg["tag"][0] == "DIRECTION":
-        direction_var = myarg["name"]
-    cudawrappers_prolog += (
-"""  enum cudaMemcpyKind _direction = kind;
-  if (%s == cudaMemcpyDefault) {
-    cudaMemcpyGetDirection(%s, %s, &_direction);
-    %s = _direction;
-  }
-
-""" % (direction_var, dest_var, src_var, direction_var))
 
   cudawrappers_epilog = (
 """
@@ -612,7 +627,8 @@ def write_cuda_bodies(fnc, args):
     # Remove "EXTERNC for all uses after this (inside a function)
     fnc["type"] = fnc["type"][len("EXTERNC "):]
 
-  cudawrappers.write(cudawrappers_prolog)
+  emit_wrapper_prolog(cudawrappers, fnc, args)
+
   cudawrappers.write(
 """  // Write the IN arguments (and INOUT and IN_DEEPCOPY) to the proxy
   enum cuda_op op = OP_%s;
