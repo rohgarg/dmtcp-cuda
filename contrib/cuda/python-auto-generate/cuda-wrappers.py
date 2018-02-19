@@ -373,6 +373,10 @@ def MEMCPY(dest, source, size=None, buf_offset=None):
 #               emit_wrapper_recv_prolog, emit_wrapper_recv,
 #               emit_wrapper_recv_reply
 
+# These parameters must be passed to proxy as copy-by-value
+in_style_tags = ["IN", "SIZE", "DEST", "SRC",
+                 "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]
+
 def emit_wrapper_prolog(cudawrappers, fnc, args):
   flushDirtyPages_prolog = (
   """// TODO: Ideally, we should flush only when the function uses the
@@ -425,6 +429,25 @@ def emit_wrapper_prolog(cudawrappers, fnc, args):
 
   cudawrappers.write(cudawrappers_prolog)
 # END: emit_wrapper_prolog(cudawrappers, fnc, args)
+
+def emit_wrapper_pack_args(cudawrappers, fnc, args):
+  global in_style_tags
+  cudawrappers.write(
+"""  // Write the IN arguments (and INOUT and IN_DEEPCOPY) to the proxy
+  enum cuda_op op = OP_%s;
+  memcpy(send_buf + chars_sent, &op, sizeof op);
+  chars_sent += sizeof(enum cuda_op);
+""" % fnc["name"])
+  for arg in args:
+    if arg["tag"][0] in in_style_tags:
+      (var, size) = (arg["name"], "sizeof " + arg["name"])
+      cudawrappers.write(("  memcpy(send_buf + chars_sent, & %s, %s);\n" +
+                          "  chars_sent += %s;\n") % (var, size, size))
+    elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
+      (var, size) = (arg["name"], "sizeof *" + arg["name"])
+      cudawrappers.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
+                          "  chars_sent += %s;\n") % (var, size, size))
+# END: emit_wrapper_pack_args(cudawrappers, fnc, args)
 
 # ===================================================================
 # EMIT GENERATED CODE
@@ -579,9 +602,6 @@ def write_cuda_bodies(fnc, args):
                ', '.join([arg["name"] for arg in args]) +
                ')'
              )
-  # These parameters must be passed to proxy as copy-by-value
-  in_style_tags = ["IN", "SIZE", "DEST", "SRC",
-                   "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]
   direction_declared = False;
 
   cudawrappers_epilog = (
@@ -629,21 +649,8 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_prolog(cudawrappers, fnc, args)
 
-  cudawrappers.write(
-"""  // Write the IN arguments (and INOUT and IN_DEEPCOPY) to the proxy
-  enum cuda_op op = OP_%s;
-  memcpy(send_buf + chars_sent, &op, sizeof op);
-  chars_sent += sizeof(enum cuda_op);
-""" % fnc["name"])
-  for arg in args:
-    if arg["tag"][0] in in_style_tags:
-      (var, size) = (arg["name"], "sizeof " + arg["name"])
-      cudawrappers.write(("  memcpy(send_buf + chars_sent, & %s, %s);\n" +
-                          "  chars_sent += %s;\n") % (var, size, size))
-    elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
-      (var, size) = (arg["name"], "sizeof *" + arg["name"])
-      cudawrappers.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
-                          "  chars_sent += %s;\n") % (var, size, size))
+  emit_wrapper_pack_args(cudawrappers, fnc, args)
+
 
   cudawrappers.write("%s" % ("  unlock_proxy();" if use_shm else
 """
@@ -710,6 +717,7 @@ def write_cuda_bodies(fnc, args):
   cudaproxy2.write(fnc_args.replace("const ", "") + "\n")
   cudaproxy2.write(cudaproxy_prolog)
 
+  global in_style_tags
   args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
                                              if arg["tag"][0] in in_style_tags]
   args_in_sizeof += [" + sizeof *" + arg["name"] for arg in args
