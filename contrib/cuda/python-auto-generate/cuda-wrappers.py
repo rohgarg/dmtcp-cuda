@@ -483,6 +483,31 @@ def emit_wrapper_recv_prolog(cudawrappers, fnc, args):
     cudawrappers.write("  chars_rcvd = sizeof ret_val;\n")
 # END: emit_wrapper_recv_prolog(cudawrappers, fnc, args)
 
+def emit_wrapper_recv_reply(cudawrappers, fnc, args):
+  # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
+  logging_line = (
+    "\n  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);\n"
+    if fnc["isLogging"] else "")
+  cudawrappers.write(
+"""  %s
+  %s
+  // Extract OUT variables
+  chars_rcvd = 0;
+""" % ("wait_for_masters_turn();" if use_shm else "JASSERT(readAll(skt_master, recv_buf, chars_rcvd) == chars_rcvd)(JASSERT_ERRNO);", logging_line))
+  for arg in args:
+    if arg["tag"][0] in ["OUT", "INOUT"]:
+      (var, size) = (arg["name"], "sizeof *" + arg["name"])
+      # Strip one '*' from arg["type"] on next line
+      assert arg["type"].rstrip().endswith('*')
+      cudawrappers.write(("  memcpy(%s, recv_buf + chars_rcvd, %s);\n" +
+                          "  chars_rcvd += %s;\n") % (var, size, size))
+
+  cudawrappers.write(
+"""
+  memcpy(&ret_val, recv_buf + chars_rcvd, sizeof ret_val);
+""")
+# END: emit_wrapper_recv_reply(cudawrappers, fnc, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -690,25 +715,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_recv_prolog(cudawrappers, fnc, args)
 
-  # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
-  logging_line = "\n  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);\n" if fnc["isLogging"] else ""
-  cudawrappers.write(
-"""  %s
-  %s
-  // Extract OUT variables
-  chars_rcvd = 0;
-""" % ("wait_for_masters_turn();" if use_shm else "JASSERT(readAll(skt_master, recv_buf, chars_rcvd) == chars_rcvd)(JASSERT_ERRNO);", logging_line))
-  for arg in args:
-    if arg["tag"][0] in ["OUT", "INOUT"]:
-      (var, size) = (arg["name"], "sizeof *" + arg["name"])
-      # Strip one '*' from arg["type"] on next line
-      assert arg["type"].rstrip().endswith('*')
-      cudawrappers.write(("  memcpy(%s, recv_buf + chars_rcvd, %s);\n" +
-                          "  chars_rcvd += %s;\n") % (var, size, size))
-  cudawrappers.write(
-"""
-  memcpy(&ret_val, recv_buf + chars_rcvd, sizeof ret_val);
-""")
+  emit_wrapper_recv_reply(cudawrappers, fnc, args)
 
   # This occurs after we send to the proxy process because
   #   application_after does not use recv_buf.  It does its own recv, since
