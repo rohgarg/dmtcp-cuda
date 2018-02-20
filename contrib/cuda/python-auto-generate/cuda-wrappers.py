@@ -618,6 +618,13 @@ def emit_proxy_recv_args_epilog(cudaproxy2, args):
        size, size))
 # END: emit_proxy_recv_args_epilog(cudaproxy2, args)
 
+def emit_proxy_recv_args_cudaMemcpy(cudaproxy2, proxy_cudaMemcpyDir_prolog):
+  # This occurs after we receive from the application process because
+  #   wrapper_cudaMemcpyDir_prolog did not use the send_buf.  It sent its own
+  #   send, since this was typically a pointer to a buffer in the appl. code.
+  cudaproxy2.write(proxy_cudaMemcpyDir_prolog)
+# END: emit_proxy_recv_args_cudaMemcpy(cudaproxy2, proxy_cudaMemcpyDir_prolog)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -821,10 +828,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_recv_args_epilog(cudaproxy2, args)
 
-  # This occurs after we receive from the application process because
-  #   wrapper_cudaMemcpyDir_prolog did not use the send_buf.  It sent its own
-  #   send, since this was typically a pointer to a buffer in the appl. code.
-  cudaproxy2.write(proxy_cudaMemcpyDir_prolog)
+  emit_proxy_recv_args_cudaMemcpy(cudaproxy2, proxy_cudaMemcpyDir_prolog)
 
   args_out = [arg for arg in args if arg["tag"][0] in ["OUT", "INOUT"]]
   # FIXME:  This "// Declare base variables" seems to be repeated. Remove???
