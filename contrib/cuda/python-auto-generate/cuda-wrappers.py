@@ -199,8 +199,6 @@ while ast_wrappers:
 # AUXILIARY UTILTIES FOR cudaMemcpyKind (key: "DIRECTION")
 # INPUT:  annotated AST, and isLogging argument
 # OUTPUT FILES: cudaMemcpyDir
-# FIXME:  RENAME:
-#   application_before->cudaMemcpy_prolog, application_after->cudaMemcpy_epilog
 
 # ====
 # Utilities for CudaMemcpy, cudaMallocHost, etc.
@@ -209,7 +207,8 @@ while ast_wrappers:
 #          either cudaMallocHost() or cudaHostAlloc() or malloc().  But note
 #          that cudaMallocHost(), etc. can be pinnned memory in proxy process.
 def cudaMemcpyExtraCode(args, isLogging):
-  (application_before, application_after, proxy_before, proxy_after) = 4*[""]
+  (wrapper_cudaMemcpyDir_prolog, wrapper_cudaMemcpy_epilog,
+   proxy_cudaMemcpyDir_prolog, proxy_cudaMemcpyDir_epilog) = 4*[""]
   args_dict = {}
   for key in ["DEST", "SRC", "IN_BUF", "SIZE",
               "DEST_PITCH", "SRC_PITCH", "HEIGHT", "DIRECTION"]:
@@ -218,16 +217,16 @@ def cudaMemcpyExtraCode(args, isLogging):
     args_dict[arg["tag"][0]] = arg["name"]
 
   if args_dict["IN_BUF"]:  # if "IN_BUF" and "SIZE" exist
-    application_before += (
+    wrapper_cudaMemcpyDir_prolog += (
 """  JASSERT(writeAll(skt_master, %s, %s) == %s) (JASSERT_ERRNO);
 """ % (args_dict["IN_BUF"], args_dict["SIZE"], args_dict["SIZE"]))
-    proxy_before += (
+    proxy_cudaMemcpyDir_prolog += (
 """  // Allocate memory for IN_BUF arguments and receive data
   %s = malloc(%s);
   assert(readAll(skt_accept, %s, %s) == %s);
 """ % (args_dict["IN_BUF"], args_dict["SIZE"],
        args_dict["IN_BUF"], args_dict["SIZE"], args_dict["SIZE"]))
-    proxy_after += (
+    proxy_cudaMemcpyDir_epilog += (
 """
   // Free the buffer for IN_BUF arguments
   free(%s);
@@ -236,15 +235,16 @@ def cudaMemcpyExtraCode(args, isLogging):
   #====
   # Generate non-trivial extra code only if "DIRECTION" tag was specified.
   if not args_dict["DIRECTION"]:
-    return (application_before, application_after, proxy_before, proxy_after)
+    return (wrapper_cudaMemcpyDir_prolog, wrapper_cudaMemcpy_epilog,
+            proxy_cudaMemcpyDir_prolog, proxy_cudaMemcpyDir_epilog)
 
   assert args_dict["DIRECTION"] != "_direction"  # Check no name clash
-  proxy_before += (
+  proxy_cudaMemcpyDir_prolog += (
 """  enum cudaMemcpyKind _direction;
 """)
 
   assert "_size" not in args_dict.values()  # Avoid name clash
-  application_before += (
+  wrapper_cudaMemcpyDir_prolog += (
 """
   int _size = -1;
 """)
@@ -270,7 +270,7 @@ def cudaMemcpyExtraCode(args, isLogging):
 """_size = %s * %s;""") % (args_dict["DEST_PITCH"], args_dict["HEIGHT"])
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
-    application_before += (
+    wrapper_cudaMemcpyDir_prolog += (
 """  %s
   if (_direction == cudaMemcpyHostToDevice ||
       _direction == cudaMemcpyHostToHost) {
@@ -282,7 +282,8 @@ def cudaMemcpyExtraCode(args, isLogging):
 """ % (size_appl_send, args_dict["SRC"]))
   # NOTE:  We should not be logging these large buggers.
   #   We should only log CUDA fnc'only with prim. args; e.g., not cudaMemcpy()
-  application_before = application_before[:-1] # Remove last brace of '{...}'
+  # Next, remove last brace of '{...}'
+  wrapper_cudaMemcpyDir_prolog = wrapper_cudaMemcpyDir_prolog[:-1]
   if (isLogging):
     # Add '{' in comment, so editors will see balanced braces.
     cudawrappers.write(
@@ -291,7 +292,7 @@ def cudaMemcpyExtraCode(args, isLogging):
 """ % args_dict["SRC"])
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "SRC" exist
-    proxy_before += (
+    proxy_cudaMemcpyDir_prolog += (
 """  int _size = -1;
   %s
   _direction = %s;
@@ -312,7 +313,7 @@ def cudaMemcpyExtraCode(args, isLogging):
        args_dict["SRC"], size_proxy_send, args_dict["DEST"]))
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
-    proxy_after += (
+    proxy_cudaMemcpyDir_epilog += (
 """  _direction = %s;
   if (_direction == cudaMemcpyDeviceToHost ||
       _direction == cudaMemcpyHostToHost) {
@@ -328,7 +329,7 @@ def cudaMemcpyExtraCode(args, isLogging):
        args_dict["SRC"]))
 
   if args_dict["DIRECTION"]:  # if "DIRECTION" and "DEST" exist
-    application_after += (
+    wrapper_cudaMemcpy_epilog += (
 """  %s
   if (_direction == cudaMemcpyDeviceToHost ||
       _direction == cudaMemcpyHostToHost) {
@@ -338,7 +339,8 @@ def cudaMemcpyExtraCode(args, isLogging):
   }
 """ % (size_appl_recv, args_dict["DEST"]))
 
-  return (application_before, application_after, proxy_before, proxy_after)
+  return (wrapper_cudaMemcpyDir_prolog, wrapper_cudaMemcpy_epilog,
+          proxy_cudaMemcpyDir_prolog, proxy_cudaMemcpyDir_epilog)
   # End of 'cudaMemcpyExtraCode(args, isLogging)'
 
 # Not currently used
@@ -357,8 +359,8 @@ def MEMCPY(dest, source, size=None, buf_offset=None):
   return result
 
 # ===================================================================
-# CREATE AUXILIARY FUNCTIONS
-# INPUT:  annotated AST, and isLogging argument
+# CREATE AUXILIARY FUNCTIONS FOR WRAPPER
+# INPUT:  annotated AST, and isLogging argument and use_shm
 # OUTPUT FILES: emit_wrapper_prolog, emit_wrapper_pack_args,
 #               emit_wrapper_send_prolog, emit_wrapper_send,
 #               emit_wrapper_recv_prolog, emit_wrapper_recv,
@@ -440,7 +442,7 @@ def emit_wrapper_pack_args(cudawrappers, fnc, args):
                           "  chars_sent += %s;\n") % (var, size, size))
 # END: emit_wrapper_pack_args(cudawrappers, fnc, args)
 
-def emit_wrapper_send(cudawrappers, application_before):
+def emit_wrapper_send(cudawrappers, wrapper_cudaMemcpyDir_prolog):
   cudawrappers.write("%s" % ("  unlock_proxy();" if use_shm else
 """
   // Send op code and args to proxy
@@ -448,10 +450,10 @@ def emit_wrapper_send(cudawrappers, application_before):
          (JASSERT_ERRNO);
 """))
   # This occurs before we send to the proxy process because
-  #   application_before does not use send_buf.  It does its own send,
+  #   wrapper_cudaMemcpyDir_prolog does not use send_buf.  It does its own send,
   #   since this is typically a pointer to a buffer in the application code.
-  cudawrappers.write(application_before)
-# END: emit_wrapper_send(cudawrappers, application_before)
+  cudawrappers.write(wrapper_cudaMemcpyDir_prolog)
+# END: emit_wrapper_send(cudawrappers, wrapper_cudaMemcpyDir_prolog)
 
 def emit_wrapper_recv_prolog(cudawrappers, fnc, args):
   sizeof_args = [" + sizeof *" + arg["name"] for arg in args
@@ -505,11 +507,11 @@ def emit_wrapper_recv_reply(cudawrappers, fnc, args):
 """)
 # END: emit_wrapper_recv_reply(cudawrappers, fnc, args)
 
-def emit_wrapper_recv_reply_epilog(cudawrappers, application_after):
+def emit_wrapper_recv_reply_epilog(cudawrappers, wrapper_cudaMemcpy_epilog):
   # This occurs after we send to the proxy process because
-  #   application_after does not use recv_buf.  It does its own recv, since
+  #   wrapper_cudaMemcpy_epilog does not use recv_buf.  It does its own recv, since
   #   the sender typically sent a pointer to a buffer in the application code.
-  cudawrappers.write(application_after)
+  cudawrappers.write(wrapper_cudaMemcpy_epilog)
 # END: emit_wrapper_recv_reply_epilog
 
 def emit_wrapper_return(cudawrappers):
@@ -519,6 +521,12 @@ def emit_wrapper_return(cudawrappers):
 
 """)
 # END: emit_wrapper_return(cudawrappers)
+
+# ===================================================================
+# CREATE AUXILIARY FUNCTIONS FOR PROXY
+# INPUT:  annotated AST, and use_shm
+# OUTPUT FILES: emit_proxy_prolog, emit_proxy_recv,
+#               emit_proxy_epilog, emit_proxy_return
 
 # ===================================================================
 # EMIT GENERATED CODE
@@ -707,7 +715,8 @@ def write_cuda_bodies(fnc, args):
 
   # This code process the messages due to cudaMemcpy as extra messages.
   # It is inserted after sending and receiving messages in application and proxy
-  (application_before, application_after, proxy_before, proxy_after) = \
+  (wrapper_cudaMemcpyDir_prolog, wrapper_cudaMemcpy_epilog,
+   proxy_cudaMemcpyDir_prolog, proxy_cudaMemcpyDir_epilog) = \
     cudaMemcpyExtraCode(args, fnc["isLogging"])
 
   cuda_include.write("  OP_" + fnc["name"] + ",\n")
@@ -723,13 +732,13 @@ def write_cuda_bodies(fnc, args):
 
   emit_wrapper_pack_args(cudawrappers, fnc, args)
 
-  emit_wrapper_send(cudawrappers, application_before)
+  emit_wrapper_send(cudawrappers, wrapper_cudaMemcpyDir_prolog)
 
   emit_wrapper_recv_prolog(cudawrappers, fnc, args)
 
   emit_wrapper_recv_reply(cudawrappers, fnc, args)
 
-  emit_wrapper_recv_reply_epilog(cudawrappers, application_after)
+  emit_wrapper_recv_reply_epilog(cudawrappers, wrapper_cudaMemcpy_epilog)
 
   emit_wrapper_return(cudawrappers)
 
@@ -799,9 +808,9 @@ def write_cuda_bodies(fnc, args):
        size, size))
 
   # This occurs after we receive from the application process because
-  #   application_before did not use the send_buf.  It sent its own send,
-  #   since this was typically a pointer to a buffer in the application code.
-  cudaproxy2.write(proxy_before)
+  #   wrapper_cudaMemcpyDir_prolog did not use the send_buf.  It sent its own
+  #   send, since this was typically a pointer to a buffer in the appl. code.
+  cudaproxy2.write(proxy_cudaMemcpyDir_prolog)
 
   args_out = [arg for arg in args if arg["tag"][0] in ["OUT", "INOUT"]]
   # FIXME:  This "// Declare base variables" seems to be repeated. Remove???
@@ -847,10 +856,10 @@ def write_cuda_bodies(fnc, args):
 """  assert(writeAll(skt_accept, send_buf, chars_sent) == chars_sent);
 """)
   # This occurs after we send to the application process, because
-  #   application_after is not using the send_buf.  It does its own send, since
-  #   the application process typically uses a pointer to a buffer
-  #   in the application code for this large buffer.
-  cudaproxy2.write(proxy_after)
+  #   wrapper_cudaMemcpy_epilog is not using the send_buf. 
+  #   It does its own send, since the application process typically uses
+  #   a pointer to a buffer in the application code for this large buffer.
+  cudaproxy2.write(proxy_cudaMemcpyDir_epilog)
   # End of function.  No 'return' stmt for fnc returning void.
   cudaproxy2.write(
 """}
