@@ -9,13 +9,14 @@ if len(sys.argv) < 2:
   sys.exit(1)
 
 use_shm = False
-if len(sys.argv) == 3:
-  if sys.argv[2] == "--use-shm":
-    use_shm = True
-  else:
-    print sys.argv[2]
-    print "***  Usage: " + sys.argv[0] + " <CUDA_WRAPPER_FILE.template> [--use-shm]\n"
-    sys.exit(1)
+argc = 2
+if "--use-shm" in sys.argv[2:]:
+  argc += 1
+  use_shm = True
+elif len(sys.argv) != argc:
+  print "***  " + ' '.join(sys.argv)
+  print "***  Usage: " + sys.argv[0] + " <CUDA_WRAPPER_FILE.template> [--use-shm]\n"
+  sys.exit(1)
 
 wrapper_file = open(sys.argv[1])
 wrapper_declarations = wrapper_file.read()
