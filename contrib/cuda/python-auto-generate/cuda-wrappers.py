@@ -625,6 +625,24 @@ def emit_proxy_recv_args_cudaMemcpy(cudaproxy2, proxy_cudaMemcpyDir_prolog):
   cudaproxy2.write(proxy_cudaMemcpyDir_prolog)
 # END: emit_proxy_recv_args_cudaMemcpy(cudaproxy2, proxy_cudaMemcpyDir_prolog)
 
+def emit_proxy_fnc_call_prolog(cudaproxy2, args):
+  args_out = [arg for arg in args if arg["tag"][0] in ["OUT", "INOUT"]]
+  # FIXME:  This "// Declare base variables" seems to be repeated. Remove???
+  if len(args_out) > 0:
+    cudaproxy2.write("""
+  // Declare base variables for OUT arguments to point to
+""")
+  for arg in args_out:
+    if arg["tag"][0] in ["OUT", "INOUT"]:
+      # Strip one '*' from arg["type"] on next line
+      (type, base_var) = (arg["type"].rstrip()[:-1].rstrip(),
+                          "base_" + arg["name"])
+      assert arg["type"].rstrip()[-1] == '*'
+      if arg["tag"][0] in ["OUT"]:
+        cudaproxy2.write(("  %s %s;\n") % (type, base_var))
+      cudaproxy2.write(("  %s = &%s;\n") % (arg["name"], base_var))
+# END: emit_proxy_fnc_call_prolog(cudaproxy2, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -830,21 +848,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_recv_args_cudaMemcpy(cudaproxy2, proxy_cudaMemcpyDir_prolog)
 
-  args_out = [arg for arg in args if arg["tag"][0] in ["OUT", "INOUT"]]
-  # FIXME:  This "// Declare base variables" seems to be repeated. Remove???
-  if len(args_out) > 0:
-    cudaproxy2.write("""
-  // Declare base variables for OUT arguments to point to
-""")
-  for arg in args_out:
-    if arg["tag"][0] in ["OUT", "INOUT"]:
-      # Strip one '*' from arg["type"] on next line
-      (type, base_var) = (arg["type"].rstrip()[:-1].rstrip(),
-                          "base_" + arg["name"])
-      assert arg["type"].rstrip()[-1] == '*'
-      if arg["tag"][0] in ["OUT"]:
-        cudaproxy2.write(("  %s %s;\n") % (type, base_var))
-      cudaproxy2.write(("  %s = &%s;\n") % (arg["name"], base_var))
+  emit_proxy_fnc_call_prolog(cudaproxy2, args)
 
   cudaproxy2.write(
 """
@@ -869,6 +873,7 @@ def write_cuda_bodies(fnc, args):
   cudaproxy2.write("""  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
   chars_sent += sizeof ret_val;
 """)
+
   if use_shm:
     cudaproxy2.write(
 """  unlock_master();
