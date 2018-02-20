@@ -657,6 +657,20 @@ def emit_proxy_fnc_call(cudaproxy2, fnc, args):
   cudaproxy2.write("  CUDA_CALL_END_TIME(%s);\n" % ("OP_" + fnc["name"]))
 # END: emit_proxy_fnc_call(cudaproxy2, fnc, args)
 
+def emit_proxy_reply_prolog(cudaproxy2, args):
+  cudaproxy2.write("""
+  // Write back the arguments to the application
+""")
+  for arg in args:
+    if arg["tag"][0] in ["OUT", "INOUT"]:
+      (var, size) = (arg["name"], "sizeof *" + arg["name"])
+      cudaproxy2.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
+                        "  chars_sent += %s;\n") % (var, size, size))
+  cudaproxy2.write("""  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
+  chars_sent += sizeof ret_val;
+""")
+# END: emit_proxy_reply_prolog(cudaproxy2, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -866,17 +880,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_fnc_call(cudaproxy2, fnc, args)
 
-  cudaproxy2.write("""
-  // Write back the arguments to the application
-""")
-  for arg in args:
-    if arg["tag"][0] in ["OUT", "INOUT"]:
-      (var, size) = (arg["name"], "sizeof *" + arg["name"])
-      cudaproxy2.write(("  memcpy(send_buf + chars_sent, %s, %s);\n" +
-                        "  chars_sent += %s;\n") % (var, size, size))
-  cudaproxy2.write("""  memcpy(send_buf + chars_sent, &ret_val, sizeof ret_val);
-  chars_sent += sizeof ret_val;
-""")
+  emit_proxy_reply_prolog(cudaproxy2, args)
 
   if use_shm:
     cudaproxy2.write(
@@ -886,11 +890,13 @@ def write_cuda_bodies(fnc, args):
     cudaproxy2.write(
 """  assert(writeAll(skt_accept, send_buf, chars_sent) == chars_sent);
 """)
+
   # This occurs after we send to the application process, because
   #   wrapper_cudaMemcpy_epilog is not using the send_buf. 
   #   It does its own send, since the application process typically uses
   #   a pointer to a buffer in the application code for this large buffer.
   cudaproxy2.write(proxy_cudaMemcpyDir_epilog)
+
   # End of function.  No 'return' stmt for fnc returning void.
   cudaproxy2.write(
 """}
