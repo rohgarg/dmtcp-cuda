@@ -682,6 +682,15 @@ def emit_proxy_reply(cudaproxy2):
 """)
 # END: emit_proxy_reply(cudaproxy2)
 
+def emit_proxy_reply_epilog(cudaproxy2, proxy_cudaMemcpyDir_epilog):
+  # This occurs after we send to the application process, because
+  #   wrapper_cudaMemcpy_epilog is not using the send_buf. 
+  #   It does its own send, since the application process typically uses
+  #   a pointer to a buffer in the application code for this large buffer.
+  cudaproxy2.write(proxy_cudaMemcpyDir_epilog)
+# END: emit_proxy_reply_epilog(cudaproxy2, proxy_cudaMemcpyDir_epilog)
+
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -895,11 +904,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_reply(cudaproxy2)
 
-  # This occurs after we send to the application process, because
-  #   wrapper_cudaMemcpy_epilog is not using the send_buf. 
-  #   It does its own send, since the application process typically uses
-  #   a pointer to a buffer in the application code for this large buffer.
-  cudaproxy2.write(proxy_cudaMemcpyDir_epilog)
+  emit_proxy_reply_epilog(cudaproxy2, proxy_cudaMemcpyDir_epilog)
 
   # End of function.  No 'return' stmt for fnc returning void.
   cudaproxy2.write(
