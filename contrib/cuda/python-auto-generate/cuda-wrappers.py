@@ -538,6 +538,26 @@ def emit_proxy_declarations(cudaproxy2, fnc, args):
   int chars_rcvd = 0;
   %s ret_val;
 """ % (fnc["type"].replace("EXTERNC ", "")))
+# END: emit_proxy_declarations(cudaproxy2, fnc, args)
+
+def emit_proxy_prolog(cudaproxy2, args):
+  if use_shm:
+    cudaproxy_prolog = "  char *send_buf = shared_mem_ptr;\n"
+  else:  # use socket
+    cudaproxy_prolog = "  char send_buf[1000];\n"
+  def some_incoming_args(args):
+    return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
+  if some_incoming_args(args):
+    if use_shm:
+      cudaproxy_prolog += (
+"""  char *recv_buf = shared_mem_ptr;
+""")
+    else:
+      cudaproxy_prolog += (
+"""  char recv_buf[1000];
+""")
+  cudaproxy2.write(cudaproxy_prolog)
+# END: emit_proxy_prolog(cudaproxy2, args)
 
 # ===================================================================
 # EMIT GENERATED CODE
@@ -696,22 +716,6 @@ def write_cuda_bodies(fnc, args):
 
 """)
 
-  cudaproxy_prolog = (
-"""  %s
-""" % ("char *send_buf = shared_mem_ptr;"
-       if use_shm else "char send_buf[1000];"))
-  def some_incoming_args(args):
-    return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
-  if some_incoming_args(args):
-    if use_shm:
-      cudaproxy_prolog += (
-"""  char *recv_buf = shared_mem_ptr;
-""")
-    else:
-      cudaproxy_prolog += (
-"""  char recv_buf[1000];
-""")
-
   #====
   # Now write body of application function and proxy function
 
@@ -752,7 +756,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_declarations(cudaproxy2, fnc, args)
 
-  cudaproxy2.write(cudaproxy_prolog)
+  emit_proxy_prolog(cudaproxy2, args)
 
   global in_style_tags
   args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
