@@ -472,16 +472,25 @@ def emit_wrapper_recv_prolog(cudawrappers, fnc, args):
 # END: emit_wrapper_recv_prolog(cudawrappers, fnc, args)
 
 def emit_wrapper_recv_reply(cudawrappers, fnc, args):
+  if use_shm:
+    cudawrappers.write(
+""" wait_for_masters_turn();
+""")
+  else: # else use sockets
+    cudawrappers.write(
+"""  JASSERT(readAll(skt_master, recv_buf, chars_rcvd) == chars_rcvd)(JASSERT_ERRNO);
+""")
   # NOTE:  We should log CUDA fnc's only with prim. args; e.g., not cudaMemcpy()
-  logging_line = (
-    "\n  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);\n"
-    if fnc["isLogging"] else "")
+  if fnc["isLogging"]:
+    cudawrappers.write(
+"""
+  log_append(send_buf, chars_sent, recv_buf, chars_rcvd);
+""")
   cudawrappers.write(
-"""  %s
-  %s
+"""
   // Extract OUT variables
   chars_rcvd = 0;
-""" % ("wait_for_masters_turn();" if use_shm else "JASSERT(readAll(skt_master, recv_buf, chars_rcvd) == chars_rcvd)(JASSERT_ERRNO);", logging_line))
+""")
   for arg in args:
     if arg["tag"][0] in ["OUT", "INOUT"]:
       (var, size) = (arg["name"], "sizeof *" + arg["name"])
