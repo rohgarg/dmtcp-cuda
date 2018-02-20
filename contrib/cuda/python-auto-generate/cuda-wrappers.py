@@ -643,6 +643,20 @@ def emit_proxy_fnc_call_prolog(cudaproxy2, args):
       cudaproxy2.write(("  %s = &%s;\n") % (arg["name"], base_var))
 # END: emit_proxy_fnc_call_prolog(cudaproxy2, args)
 
+def emit_proxy_fnc_call(cudaproxy2, fnc, args):
+  cudaproxy2.write(
+"""
+  // Make the function call
+  CUDA_CALL_START_TIME(%s);
+""" % ("OP_" + fnc["name"]))
+  fnc_call = (fnc["name"] + '(' +
+               ', '.join([arg["name"] for arg in args]) +
+               ')'
+             )
+  cudaproxy2.write("  ret_val = " + fnc_call + ";\n")
+  cudaproxy2.write("  CUDA_CALL_END_TIME(%s);\n" % ("OP_" + fnc["name"]))
+# END: emit_proxy_fnc_call(cudaproxy2, fnc, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -850,17 +864,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_fnc_call_prolog(cudaproxy2, args)
 
-  cudaproxy2.write(
-"""
-  // Make the function call
-  CUDA_CALL_START_TIME(%s);
-""" % ("OP_" + fnc["name"]))
-  fnc_call = (fnc["name"] + '(' +
-               ', '.join([arg["name"] for arg in args]) +
-               ')'
-             )
-  cudaproxy2.write("  ret_val = " + fnc_call + ";\n")
-  cudaproxy2.write("  CUDA_CALL_END_TIME(%s);\n" % ("OP_" + fnc["name"]))
+  emit_proxy_fnc_call(cudaproxy2, fnc, args)
 
   cudaproxy2.write("""
   // Write back the arguments to the application
