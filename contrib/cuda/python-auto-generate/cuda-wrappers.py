@@ -674,13 +674,6 @@ def write_cuda_bodies(fnc, args):
                           for arg in args]) +
                ')'
               )
-  fnc_args = (''.join(["  " + arg["type"] + ' ' + arg["name"] + ";\n"
-                      for arg in args])
-             )
-  fnc_call = (fnc["name"] + '(' +
-               ', '.join([arg["name"] for arg in args]) +
-               ')'
-             )
 
   # FIXME:  This code appears to be orphaned.  Should be deleted.
   cudawrappers_epilog = (
@@ -694,10 +687,8 @@ def write_cuda_bodies(fnc, args):
 
   cudaproxy_prolog = (
 """  %s
-  int chars_sent = 0;
-  int chars_rcvd = 0;
-  %s ret_val;
-""" % ("char *send_buf = shared_mem_ptr;" if use_shm else "char send_buf[1000];", fnc["type"].replace("EXTERNC ", "")))
+""" % ("char *send_buf = shared_mem_ptr;"
+       if use_shm else "char send_buf[1000];"))
   def some_incoming_args(args):
     return [arg for arg in args if arg["tag"][0] not in ["OUT"]]
   if some_incoming_args(args):
@@ -747,7 +738,17 @@ def write_cuda_bodies(fnc, args):
 
   # Write FNC_XXX() declarations into the second half of the .h file.
   cudaproxy2.write("void FNC_" + fnc["name"] + "(void)\n{\n")
+
+  fnc_args = (''.join(["  " + arg["type"] + ' ' + arg["name"] + ";\n"
+                      for arg in args])
+             )
   cudaproxy2.write(fnc_args.replace("const ", "") + "\n")
+  cudaproxy2.write(
+"""  int chars_sent = 0;
+  int chars_rcvd = 0;
+  %s ret_val;
+""" % (fnc["type"].replace("EXTERNC ", "")))
+
   cudaproxy2.write(cudaproxy_prolog)
 
   global in_style_tags
@@ -833,6 +834,10 @@ def write_cuda_bodies(fnc, args):
   // Make the function call
   CUDA_CALL_START_TIME(%s);
 """ % ("OP_" + fnc["name"]))
+  fnc_call = (fnc["name"] + '(' +
+               ', '.join([arg["name"] for arg in args]) +
+               ')'
+             )
   cudaproxy2.write("  ret_val = " + fnc_call + ";\n")
   cudaproxy2.write("  CUDA_CALL_END_TIME(%s);\n" % ("OP_" + fnc["name"]))
 
