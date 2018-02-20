@@ -671,6 +671,17 @@ def emit_proxy_reply_prolog(cudaproxy2, args):
 """)
 # END: emit_proxy_reply_prolog(cudaproxy2, args)
 
+def emit_proxy_reply(cudaproxy2):
+  if use_shm:
+    cudaproxy2.write(
+"""  unlock_master();
+""")
+  else:
+    cudaproxy2.write(
+"""  assert(writeAll(skt_accept, send_buf, chars_sent) == chars_sent);
+""")
+# END: emit_proxy_reply(cudaproxy2)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -882,14 +893,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_reply_prolog(cudaproxy2, args)
 
-  if use_shm:
-    cudaproxy2.write(
-"""  unlock_master();
-""")
-  else:
-    cudaproxy2.write(
-"""  assert(writeAll(skt_accept, send_buf, chars_sent) == chars_sent);
-""")
+  emit_proxy_reply(cudaproxy2)
 
   # This occurs after we send to the application process, because
   #   wrapper_cudaMemcpy_epilog is not using the send_buf. 
