@@ -588,6 +588,36 @@ def emit_proxy_recv_args(cudaproxy2, args):
 """)
 # END: emit_proxy_recv_args(cudaproxy2, args)
 
+def emit_proxy_recv_args_epilog(cudaproxy2, args):
+  global in_style_tags
+  in_style_tags_exist = [arg for arg in args if arg["tag"][0] in in_style_tags]
+  if in_style_tags_exist:
+    cudaproxy2.write(
+"""  // Now read the data for the total chars_rcvd
+  chars_rcvd = %s;
+""" % ("sizeof(enum cuda_op);" if use_shm else "0")
+    )
+  for arg in args:
+    if arg["tag"][0] in in_style_tags:  # if copy-by-value parameter
+      (var, size) = (arg["name"], "sizeof " + arg["name"])
+      cudaproxy2.write(("  memcpy(&%s, recv_buf + chars_rcvd, %s);\n" +
+                        "  chars_rcvd += %s;\n") % (var, size, size))
+    elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
+      # Typically, the cuda parameter is of type:  struct cudaSomething *param
+      # Strip one '*' from arg["type"] on next line
+      (type, base_var, size) = (arg["type"].rstrip()[:-1].rstrip(),
+                                "base_" + arg["name"], "sizeof *" + arg["name"])
+      assert arg["type"].rstrip()[-1] == '*'
+      cudaproxy2.write(
+"""  // Declare base variables for IN_DEEPCOPY and INOUT arguments to point to
+  %s %s;
+  %s = &%s;
+  memcpy(&%s, recv_buf + chars_rcvd, %s);
+  chars_rcvd += %s;
+""" % (type.replace("const ", ""), base_var, arg["name"], base_var, base_var,
+       size, size))
+# END: emit_proxy_recv_args_epilog(cudaproxy2, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -789,33 +819,7 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_recv_args(cudaproxy2, args)
 
-  global in_style_tags
-  in_style_tags_exist = [arg for arg in args if arg["tag"][0] in in_style_tags]
-  if in_style_tags_exist:
-    cudaproxy2.write(
-"""  // Now read the data for the total chars_rcvd
-  chars_rcvd = %s;
-""" % ("sizeof(enum cuda_op);" if use_shm else "0")
-    )
-  for arg in args:
-    if arg["tag"][0] in in_style_tags:  # if copy-by-value parameter
-      (var, size) = (arg["name"], "sizeof " + arg["name"])
-      cudaproxy2.write(("  memcpy(&%s, recv_buf + chars_rcvd, %s);\n" +
-                        "  chars_rcvd += %s;\n") % (var, size, size))
-    elif arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]:
-      # Typically, the cuda parameter is of type:  struct cudaSomething *param
-      # Strip one '*' from arg["type"] on next line
-      (type, base_var, size) = (arg["type"].rstrip()[:-1].rstrip(),
-                                "base_" + arg["name"], "sizeof *" + arg["name"])
-      assert arg["type"].rstrip()[-1] == '*'
-      cudaproxy2.write(
-"""  // Declare base variables for IN_DEEPCOPY and INOUT arguments to point to
-  %s %s;
-  %s = &%s;
-  memcpy(&%s, recv_buf + chars_rcvd, %s);
-  chars_rcvd += %s;
-""" % (type.replace("const ", ""), base_var, arg["name"], base_var, base_var,
-       size, size))
+  emit_proxy_recv_args_epilog(cudaproxy2, args)
 
   # This occurs after we receive from the application process because
   #   wrapper_cudaMemcpyDir_prolog did not use the send_buf.  It sent its own
