@@ -559,6 +559,35 @@ def emit_proxy_prolog(cudaproxy2, args):
   cudaproxy2.write(cudaproxy_prolog)
 # END: emit_proxy_prolog(cudaproxy2, args)
 
+def emit_proxy_recv_args(cudaproxy2, args):
+  global in_style_tags
+  args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
+                                             if arg["tag"][0] in in_style_tags]
+  args_in_sizeof += [" + sizeof *" + arg["name"] for arg in args
+                                if arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]]
+  args_in_sizeof = ''.join(args_in_sizeof)
+  if len(args_in_sizeof) >= 3:
+    args_in_sizeof = args_in_sizeof[3:]  # Remove initial " + "
+  cudaproxy2.write(
+"""
+  // Receive the arguments
+""")
+  if len(args_in_sizeof) == 0:
+    cudaproxy2.write(
+"""  // No primitive args to receive.  Will not read from skt_accept.
+""")
+  elif use_shm:
+    cudaproxy2.write(
+"""  // No recv needed; using shared memory; args are in shared memory
+""")
+  else: # else use socket
+    cudaproxy2.write(
+"""  // Compute total chars_rcvd to be read in the next msg
+  chars_rcvd = """ + args_in_sizeof + """;
+  assert(readAll(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
+""")
+# END: emit_proxy_recv_args(cudaproxy2, args)
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -758,43 +787,16 @@ def write_cuda_bodies(fnc, args):
 
   emit_proxy_prolog(cudaproxy2, args)
 
+  emit_proxy_recv_args(cudaproxy2, args)
+
   global in_style_tags
-  args_in_sizeof = [" + sizeof " + arg["name"] for arg in args
-                                             if arg["tag"][0] in in_style_tags]
-  args_in_sizeof += [" + sizeof *" + arg["name"] for arg in args
-                                if arg["tag"][0] in ["IN_DEEPCOPY", "INOUT"]]
-  args_in_sizeof = ''.join(args_in_sizeof)
-  if len(args_in_sizeof) >= 3:
-    args_in_sizeof = args_in_sizeof[3:]  # Remove initial " + "
-  if use_shm:
+  in_style_tags_exist = [arg for arg in args if arg["tag"][0] in in_style_tags]
+  if in_style_tags_exist:
     cudaproxy2.write(
-"""
-  // Receive the arguments
-""" +
-    # Python inline if-else:
-    (
 """  // Now read the data for the total chars_rcvd
-  chars_rcvd = sizeof(enum cuda_op);
-"""
-    if len(args_in_sizeof) > 0
-    else "  // No primitive args to receive.  Will not read from skt_accept.\n")
-  )
-  else:
-    cudaproxy2.write(
-"""
-  // Receive the arguments
-""" +
-    # Python inline if-else:
-    (
-"""  // Compute total chars_rcvd to be read in the next msg
-  chars_rcvd = """ + args_in_sizeof + """;
-  assert(readAll(skt_accept, recv_buf, chars_rcvd) == chars_rcvd);
-  // Now read the data for the total chars_rcvd
-  chars_rcvd = 0;
-"""
-    if len(args_in_sizeof) > 0
-    else "  // No primitive args to receive.  Will not read from skt_accept.\n")
-  )
+  chars_rcvd = %s;
+""" % ("sizeof(enum cuda_op);" if use_shm else "0")
+    )
   for arg in args:
     if arg["tag"][0] in in_style_tags:  # if copy-by-value parameter
       (var, size) = (arg["name"], "sizeof " + arg["name"])
