@@ -528,6 +528,17 @@ def emit_wrapper_return(cudawrappers):
 # OUTPUT FILES: emit_proxy_prolog, emit_proxy_recv,
 #               emit_proxy_epilog, emit_proxy_return
 
+def emit_proxy_declarations(cudaproxy2, fnc, args):
+  fnc_args = (''.join(["  " + arg["type"] + ' ' + arg["name"] + ";\n"
+                      for arg in args])
+             )
+  cudaproxy2.write(fnc_args.replace("const ", "") + "\n")
+  cudaproxy2.write(
+"""  int chars_sent = 0;
+  int chars_rcvd = 0;
+  %s ret_val;
+""" % (fnc["type"].replace("EXTERNC ", "")))
+
 # ===================================================================
 # EMIT GENERATED CODE
 # INPUT:  ast_annotated_wrappers, cudaMemcpyDir
@@ -739,15 +750,7 @@ def write_cuda_bodies(fnc, args):
   # Write FNC_XXX() declarations into the second half of the .h file.
   cudaproxy2.write("void FNC_" + fnc["name"] + "(void)\n{\n")
 
-  fnc_args = (''.join(["  " + arg["type"] + ' ' + arg["name"] + ";\n"
-                      for arg in args])
-             )
-  cudaproxy2.write(fnc_args.replace("const ", "") + "\n")
-  cudaproxy2.write(
-"""  int chars_sent = 0;
-  int chars_rcvd = 0;
-  %s ret_val;
-""" % (fnc["type"].replace("EXTERNC ", "")))
+  emit_proxy_declarations(cudaproxy2, fnc, args)
 
   cudaproxy2.write(cudaproxy_prolog)
 
