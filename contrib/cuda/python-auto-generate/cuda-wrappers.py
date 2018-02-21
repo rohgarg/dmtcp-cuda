@@ -1,5 +1,46 @@
 #!/usr/bin/python
 
+# TODO:
+#   We probably want to allow the user to define in main.template
+#   variations on CUDA_WRAPPER, such as the following:
+#  PYTHON(
+#      def emit_MYWRAPPERS_WITH_LOGGING():
+#        ## But we would actually place this body in exec_locally(...)
+#        ## [exec_locally() is defined below.]
+#        # do_logging could be here or in main.template
+#        def do_logging(cudawrappers, fnc, args):
+#          ...
+#        old_emit_wrapper_recv_reply = emit_wrapper_recv_reply
+#        def emit_wrapper_recv_reply(cudawrappers, fnc, args):
+#          old_emit_wrapper_recv_reply(cudawrappers, fnc, args)
+#          do_logging(cudawrappers, fnc, args)
+#        # NAME CHANGE: write_cuda_bodies() -> emit_wrapper_proxy_pair()
+#        emit_wrapper_proxy_pair(fnc, args)
+#  )
+#  ## Then have MYWRAPPERS_WITH_LOGGING call emit_MYWRAPPERS_WITH_LOGGING()
+#  MYWRAPPERS_WITH_LOGGING( void foo(); )
+
+# def exec_locally(cmd):
+#   old_globals = globals().copy()
+#   try:
+#     exec(cmd, globals())
+#   except:
+#     print("*** Error: exec_locally\n" + cmd + "\n")
+#   myglobals = globals() # Place a var in locals() that points to globals()
+#   exec( "myglobals.clear()\nmyglobals.update(old_globals)", locals() )
+#
+# EXAMPLE USING exec_locally() IN INTERACTIVE PYTHON SESSION:
+# >>> def foo(): bar()
+# ... 
+# >>> exec_locally("def bar(): print 42\nfoo()")
+# 42
+# >>> 'foo' in globals()
+# True
+# >>> 'bar' in globals()
+# False
+
+# ===
+
 import sys
 import os
 import warnings
